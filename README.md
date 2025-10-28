@@ -54,6 +54,23 @@ After installation, restart your terminal or run:
 source ~/.zshrc
 ```
 
+If TAB completion doesn't appear, verify your zsh completion is initialized and the user completion directory is on `$fpath`:
+
+```zsh
+# In your ~/.zshrc (before compinit)
+fpath=("$HOME/.zsh/completion" $fpath)
+typeset -U fpath
+
+# Initialize zsh completions
+autoload -Uz compinit && compinit -i
+```
+
+Then reload your shell:
+
+```bash
+source ~/.zshrc
+```
+
 ### Manual Installation (Alternative)
 
 If you prefer to manually add the shell function, add this to your `~/.zshrc`:
@@ -148,6 +165,21 @@ Removes worktrees that:
 - Haven't been updated in 30+ days
 
 Shows a confirmation prompt before removing.
+
+### Remove a Worktree
+
+```bash
+wt rm <branch> [-f|--force]
+```
+
+- Removes the git worktree and deletes the associated directory
+- Use `-f` if the worktree has uncommitted changes
+
+Example:
+```bash
+wt rm ai-prom-metrics
+wt rm MM-123 -f
+```
 
 ### Open in Cursor
 

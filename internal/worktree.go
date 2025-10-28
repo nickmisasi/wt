@@ -147,7 +147,17 @@ func WorktreeExists(config *Config, branch string) (bool, string) {
 
 // RemoveWorktree removes a worktree
 func RemoveWorktree(path string) error {
-	cmd := exec.Command("git", "worktree", "remove", path)
+	return RemoveWorktreeWithForce(path, false)
+}
+
+// RemoveWorktreeWithForce removes a worktree; when force is true it passes -f to git
+func RemoveWorktreeWithForce(path string, force bool) error {
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "-f")
+	}
+	args = append(args, path)
+	cmd := exec.Command("git", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to remove worktree: %s", string(output))

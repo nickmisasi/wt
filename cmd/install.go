@@ -56,95 +56,50 @@ cd() {
 const completionScript = `#compdef wt
 
 _wt() {
-    local line state
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
 
     _arguments -C \
-        "1: :->cmds" \
-        "*::arg:->args"
+        '1: :->command' \
+        '*::arg:->args'
 
-    case "$state" in
-        cmds)
-            _values "wt command" \
-                "ls[List worktrees]" \
-                "co[Checkout/create worktree]" \
-                "clean[Remove stale worktrees]" \
-                "cursor[Open Cursor editor]" \
-                "install[Install shell integration]" \
-                "help[Show help]"
+    case $state in
+        command)
+            _values 'wt command' \
+                'ls[List worktrees]' \
+                'co[Checkout/create worktree]' \
+                'rm[Remove a worktree]' \
+                'clean[Remove stale worktrees]' \
+                'cursor[Open Cursor editor]' \
+                'install[Install shell integration]' \
+                'help[Show help]'
             ;;
         args)
-            case "$line[1]" in
-                co|cursor)
-                    _wt_branches
+            case $line[1] in
+                co|cursor|rm)
+                    _wt_complete_branches
                     ;;
             esac
             ;;
     esac
 }
 
-_wt_branches() {
-    local -a branches remote_branches worktree_branches all_branches descriptions
-    
-    # Get worktree branches (highest priority)
-    if git rev-parse --git-dir >/dev/null 2>&1; then
-        local repo_name=$(git config --get remote.origin.url 2>/dev/null | sed 's|.*/||; s|\.git$||')
-        [[ -z "$repo_name" ]] && repo_name=$(basename "$(git rev-parse --show-toplevel)")
-        
-        # Extract branch names from actual git worktrees
-        local current_path=""
-        while IFS= read -r line; do
-            if [[ "$line" == worktree\ * ]]; then
-                current_path="${line#worktree }"
-            elif [[ "$line" == branch\ refs/heads/* ]] && [[ -n "$current_path" ]]; then
-                # Only include worktrees in our managed directory
-                if [[ "$current_path" == "$HOME/workspace/worktrees/${repo_name}-"* ]]; then
-                    local branch_name="${line#branch refs/heads/}"
-                    worktree_branches+=("$branch_name")
-                fi
-                current_path=""
-            elif [[ -z "$line" ]]; then
-                current_path=""
-            fi
-        done < <(git worktree list --porcelain 2>/dev/null)
-    fi
-    
-    # Get local branches
-    branches=(${(f)"$(git branch --format='%(refname:short)' 2>/dev/null)"})
-    
-    # Get remote branches
-    remote_branches=(${(f)"$(git branch -r --format='%(refname:short)' 2>/dev/null | sed 's|origin/||' | grep -v 'HEAD')"})
-    
-    # Build completion arrays
-    all_branches=()
-    descriptions=()
-    
-    # Add worktrees first (with descriptions)
-    for branch in $worktree_branches; do
-        all_branches+=("$branch")
-        descriptions+=("existing worktree")
-    done
-    
-    # Add local branches (skip duplicates)
-    for branch in $branches; do
-        if (( ! ${worktree_branches[(I)$branch]} )); then
-            all_branches+=("$branch")
-            descriptions+=("local branch")
-        fi
-    done
-    
-    # Add remote branches (skip duplicates)
-    for branch in $remote_branches; do
-        if (( ! ${worktree_branches[(I)$branch]} )) && (( ! ${branches[(I)$branch]} )); then
-            all_branches+=("$branch")
-            descriptions+=("remote branch")
-        fi
-    done
-    
-    # Use compadd for better control over display
-    _wanted branches expl 'branch' compadd -d descriptions -a all_branches
-}
+_wt_complete_branches() {
+    local -a branches
+    branches=()
 
-_wt "$@"
+    branches+=(${(f)"$(
+        {
+          git branch --format='%(refname:short)';
+          git branch -r --format='%(refname:short)';
+        } 2>/dev/null |
+        sed -e 's|^origin/||' -e 's|^remotes/origin/||' -e 's|^remotes/||' |
+        grep -v '^HEAD$' |
+        sort -u
+    )"})
+
+    _describe -t branches 'branch' branches
+}
 `
 
 // RunInstall installs the shell integration and completions
@@ -207,6 +162,13 @@ func RunInstall() error {
 	fmt.Println("  1. Restart your terminal, or")
 	fmt.Println("  2. Run: source ~/.zshrc")
 	fmt.Println("\nThen try: wt help")
+	fmt.Println("\nIf TAB completion doesn't appear, verify your zsh is set up for completions:")
+	fmt.Println("  - Initialize compinit (in ~/.zshrc):")
+	fmt.Println("      autoload -Uz compinit && compinit -i")
+	fmt.Println("  - Ensure the user completion directory is on $fpath (before compinit):")
+	fmt.Println("      fpath=(\"$HOME/.zsh/completion\" $fpath)")
+	fmt.Println("      typeset -U fpath")
+	fmt.Println("  - After changing ~/.zshrc: source ~/.zshrc or open a new terminal")
 	fmt.Println()
 
 	return nil

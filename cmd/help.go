@@ -14,6 +14,7 @@ COMMANDS:
     (no args)                    Show this help and list worktrees for current repository
     ls                           List all worktrees for current repository
     co <branch> [-b <base>]      Checkout/create worktree for branch and switch to it
+    rm <branch> [-f]             Remove a worktree for branch (use -f to force)
     clean                        Remove stale worktrees (clean, >30 days old)
     cursor <branch> [-b <base>]  Open Cursor editor for branch's worktree
     install                      Install shell integration and completions
@@ -21,28 +22,7 @@ COMMANDS:
 
 OPTIONS:
     -b, --base <branch>    Base branch for new branches (defaults to main/master)
-
-EXAMPLES:
-    # List worktrees
-    wt ls
-
-    # Switch to or create worktree for branch MM-123
-    wt co MM-123
-
-    # Create worktree for MM-456 based on develop branch
-    wt co MM-456 -b develop
-
-    # Open Cursor for branch feature/new-ui
-    wt cursor feature/new-ui
-
-    # Create new branch from specific base and open in Cursor
-    wt cursor bugfix/fix-123 --base release-1.0
-
-    # Clean up old worktrees
-    wt clean
-
-    # Install shell function and completions
-    wt install
+    -f, --force            Force removal when using 'wt rm'
 
 WORKTREE STORAGE:
     Worktrees are stored in: ~/workspace/worktrees/

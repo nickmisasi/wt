@@ -56,6 +56,13 @@ func run() error {
 		branch, baseBranch := parseCheckoutArgs(args[1:])
 		return cmd.RunCheckout(config, gitRepo, branch, baseBranch)
 
+	case "rm", "remove":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: wt rm <branch> [-f|--force]")
+		}
+		branch, force := parseRemoveArgs(args[1:])
+		return cmd.RunRemove(config, branch, force)
+
 	case "clean":
 		return cmd.RunClean(config)
 
@@ -89,4 +96,21 @@ func parseCheckoutArgs(args []string) (branch string, baseBranch string) {
 	}
 
 	return branch, baseBranch
+}
+
+// parseRemoveArgs parses branch and optional --force flag
+func parseRemoveArgs(args []string) (branch string, force bool) {
+	branch = ""
+	force = false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "-f" || a == "--force" {
+			force = true
+			continue
+		}
+		if branch == "" {
+			branch = a
+		}
+	}
+	return branch, force
 }
