@@ -7,7 +7,7 @@ import (
 )
 
 // RunCheckout checks out or creates a worktree for the given branch
-func RunCheckout(config interface{}, gitRepo interface{}, branch string) error {
+func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBranch string) error {
 	cfg, ok := config.(*internal.Config)
 	if !ok {
 		return fmt.Errorf("invalid config type")
@@ -49,14 +49,18 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string) error {
 			}
 		} else {
 			// Branch doesn't exist anywhere, create it
-			fmt.Printf("Creating new branch: %s\n", branch)
+			// If no base branch specified, use the default branch
+			if baseBranch == "" {
+				baseBranch = repo.GetDefaultBranch()
+			}
+			fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
 			createNewBranch = true
 		}
 	}
 
 	// Create the worktree
 	fmt.Printf("Creating worktree for branch: %s\n", branch)
-	worktreePath, err := internal.CreateWorktree(cfg, branch, createNewBranch)
+	worktreePath, err := internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
@@ -66,4 +70,3 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string) error {
 
 	return nil
 }
-

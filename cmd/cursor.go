@@ -8,7 +8,7 @@ import (
 )
 
 // RunCursor opens Cursor editor for the given branch's worktree
-func RunCursor(config interface{}, gitRepo interface{}, branch string) error {
+func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranch string) error {
 	cfg, ok := config.(*internal.Config)
 	if !ok {
 		return fmt.Errorf("invalid config type")
@@ -26,11 +26,11 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string) error {
 
 	// Check if worktree already exists
 	exists, path := internal.WorktreeExists(cfg, branch)
-	
+
 	if !exists {
 		// Create the worktree first
 		fmt.Printf("Worktree doesn't exist for branch '%s'. Creating it...\n", branch)
-		
+
 		// Check if branch exists, create tracking branch if needed
 		branchExists, err := repo.BranchExists(branch)
 		if err != nil {
@@ -51,12 +51,17 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string) error {
 					return fmt.Errorf("failed to create tracking branch: %w", err)
 				}
 			} else {
+				// If no base branch specified, use the default branch
+				if baseBranch == "" {
+					baseBranch = repo.GetDefaultBranch()
+				}
+				fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
 				createNewBranch = true
 			}
 		}
 
 		// Create the worktree
-		path, err = internal.CreateWorktree(cfg, branch, createNewBranch)
+		path, err = internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch)
 		if err != nil {
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}
@@ -76,4 +81,3 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string) error {
 
 	return nil
 }
-

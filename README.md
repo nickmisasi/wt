@@ -20,6 +20,10 @@ A powerful CLI tool to manage Git worktrees across multiple repositories, design
 git clone <repo-url>
 cd wt
 
+# Build and install (easiest method)
+make install
+
+# Or manually:
 # Build the binary
 go build -o wt
 
@@ -86,19 +90,27 @@ Shows all worktrees for the current repository with their status and last commit
 ### Checkout/Create Worktree
 
 ```bash
-wt co <branch>
+wt co <branch> [-b <base-branch>]
 ```
 
 - If the worktree exists, switches to it
 - If not, creates the worktree and switches to it
 - If branch doesn't exist locally but exists on remote, creates a tracking branch
-- If branch doesn't exist anywhere, creates a new branch
+- If branch doesn't exist anywhere, creates a new branch from base branch (defaults to main/master)
 
-Example:
+Examples:
 ```bash
+# Create worktree from default branch
 wt co MM-123
 # Creates worktree at ~/workspace/worktrees/mattermost-plugin-ai-MM-123/
 # Automatically switches to that directory
+
+# Create worktree from specific base branch
+wt co feature/new-ui -b develop
+# Creates new branch 'feature/new-ui' based on 'develop' branch
+
+# Create worktree from release branch
+wt co hotfix/urgent-fix --base release-1.0
 ```
 
 ### Clean Stale Worktrees
@@ -116,10 +128,19 @@ Shows a confirmation prompt before removing.
 ### Open in Cursor
 
 ```bash
-wt cursor <branch>
+wt cursor <branch> [-b <base-branch>]
 ```
 
 Opens Cursor editor for the branch's worktree. Creates the worktree if it doesn't exist.
+
+Examples:
+```bash
+# Open existing worktree
+wt cursor MM-123
+
+# Create new worktree from develop and open in Cursor
+wt cursor feature/experiment -b develop
+```
 
 ### Show Help
 

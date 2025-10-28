@@ -27,7 +27,7 @@ func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
 
 	var worktrees []WorktreeInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	var currentWorktree WorktreeInfo
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -91,7 +91,7 @@ func getLastCommitTime(path string) time.Time {
 }
 
 // CreateWorktree creates a new worktree for the given branch
-func CreateWorktree(config *Config, branch string, createBranch bool) (string, error) {
+func CreateWorktree(config *Config, branch string, createBranch bool, baseBranch string) (string, error) {
 	worktreePath := config.GetWorktreePath(branch)
 
 	// Ensure the base directory exists
@@ -102,8 +102,12 @@ func CreateWorktree(config *Config, branch string, createBranch bool) (string, e
 	// Create the worktree
 	var cmd *exec.Cmd
 	if createBranch {
-		// Create new branch
-		cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
+		// Create new branch from base branch
+		if baseBranch != "" {
+			cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath, baseBranch)
+		} else {
+			cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
+		}
 	} else {
 		// Use existing branch
 		cmd = exec.Command("git", "worktree", "add", worktreePath, branch)
@@ -120,7 +124,7 @@ func CreateWorktree(config *Config, branch string, createBranch bool) (string, e
 // WorktreeExists checks if a worktree already exists for the given branch
 func WorktreeExists(config *Config, branch string) (bool, string) {
 	worktreePath := config.GetWorktreePath(branch)
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
 		return false, ""
@@ -171,8 +175,7 @@ func GetWorktreeByBranch(config *Config, branch string) (*WorktreeInfo, error) {
 func GetBranchNameFromWorktreePath(config *Config, path string) string {
 	// Get the directory name
 	dirName := filepath.Base(path)
-	
+
 	// Strip the repo prefix
 	return config.StripRepoPrefix(dirName)
 }
-

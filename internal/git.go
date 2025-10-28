@@ -148,3 +148,52 @@ func (g *GitRepo) ListRemoteBranches() ([]string, error) {
 	return result, nil
 }
 
+// GetDefaultBranch returns the default branch (main, master, or current branch)
+func (g *GitRepo) GetDefaultBranch() string {
+	// Try to get the default branch from remote
+	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	output, err := cmd.Output()
+	if err == nil {
+		branch := strings.TrimSpace(string(output))
+		branch = strings.TrimPrefix(branch, "refs/remotes/origin/")
+		if branch != "" {
+			return branch
+		}
+	}
+
+	// Fall back to checking if main or master exists
+	if exists, _ := g.BranchExists("main"); exists {
+		return "main"
+	}
+	if exists, _ := g.BranchExists("master"); exists {
+		return "master"
+	}
+
+	// Last resort: get current branch
+	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	output, err = cmd.Output()
+	if err == nil {
+		branch := strings.TrimSpace(string(output))
+		if branch != "" && branch != "HEAD" {
+			return branch
+		}
+	}
+
+	return "main" // Ultimate fallback
+}
+
+// BranchExistsAnywhere checks if a branch exists locally or remotely
+func (g *GitRepo) BranchExistsAnywhere(branch string) (local bool, remote bool, err error) {
+	local, err = g.BranchExists(branch)
+	if err != nil {
+		return false, false, err
+	}
+	
+	remote, err = g.RemoteBranchExists(branch)
+	if err != nil {
+		return local, false, err
+	}
+	
+	return local, remote, nil
+}
+

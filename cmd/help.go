@@ -11,13 +11,16 @@ USAGE:
     wt [command] [arguments]
 
 COMMANDS:
-    (no args)         Show this help and list worktrees for current repository
-    ls                List all worktrees for current repository
-    co <branch>       Checkout/create worktree for branch and switch to it
-    clean             Remove stale worktrees (clean, >30 days old)
-    cursor <branch>   Open Cursor editor for branch's worktree
-    install           Install shell integration and completions
-    help              Show this help message
+    (no args)                    Show this help and list worktrees for current repository
+    ls                           List all worktrees for current repository
+    co <branch> [-b <base>]      Checkout/create worktree for branch and switch to it
+    clean                        Remove stale worktrees (clean, >30 days old)
+    cursor <branch> [-b <base>]  Open Cursor editor for branch's worktree
+    install                      Install shell integration and completions
+    help                         Show this help message
+
+OPTIONS:
+    -b, --base <branch>    Base branch for new branches (defaults to main/master)
 
 EXAMPLES:
     # List worktrees
@@ -26,8 +29,14 @@ EXAMPLES:
     # Switch to or create worktree for branch MM-123
     wt co MM-123
 
+    # Create worktree for MM-456 based on develop branch
+    wt co MM-456 -b develop
+
     # Open Cursor for branch feature/new-ui
     wt cursor feature/new-ui
+
+    # Create new branch from specific base and open in Cursor
+    wt cursor bugfix/fix-123 --base release-1.0
 
     # Clean up old worktrees
     wt clean
@@ -38,6 +47,12 @@ EXAMPLES:
 WORKTREE STORAGE:
     Worktrees are stored in: ~/workspace/worktrees/
     Format: <repo-name>-<branch-name>/
+
+BASE BRANCH:
+    When creating a new branch that doesn't exist locally or remotely, you can
+    specify which branch to base it on using -b or --base. If not specified,
+    the tool will automatically detect and use the repository's default branch
+    (main or master).
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.

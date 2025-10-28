@@ -51,21 +51,42 @@ func run() error {
 
 	case "co", "checkout":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: wt co <branch>")
+			return fmt.Errorf("usage: wt co <branch> [-b|--base <base-branch>]")
 		}
-		return cmd.RunCheckout(config, gitRepo, args[1])
+		branch, baseBranch := parseCheckoutArgs(args[1:])
+		return cmd.RunCheckout(config, gitRepo, branch, baseBranch)
 
 	case "clean":
 		return cmd.RunClean(config)
 
 	case "cursor":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: wt cursor <branch>")
+			return fmt.Errorf("usage: wt cursor <branch> [-b|--base <base-branch>]")
 		}
-		return cmd.RunCursor(config, gitRepo, args[1])
+		branch, baseBranch := parseCheckoutArgs(args[1:])
+		return cmd.RunCursor(config, gitRepo, branch, baseBranch)
 
 	default:
 		return fmt.Errorf("unknown command: %s\nRun 'wt help' for usage information", args[0])
 	}
 }
 
+// parseCheckoutArgs parses branch and optional base branch from command arguments
+func parseCheckoutArgs(args []string) (branch string, baseBranch string) {
+	if len(args) == 0 {
+		return "", ""
+	}
+
+	branch = args[0]
+	baseBranch = ""
+
+	// Look for -b or --base flag
+	for i := 1; i < len(args); i++ {
+		if (args[i] == "-b" || args[i] == "--base") && i+1 < len(args) {
+			baseBranch = args[i+1]
+			break
+		}
+	}
+
+	return branch, baseBranch
+}
