@@ -83,13 +83,58 @@ _wt() {
 }
 
 _wt_branches() {
-    local branches
+    local branches remote_branches worktree_branches all_completions
+    worktree_branches=()
+    all_completions=()
+    
+    # Get worktree branches (highest priority)
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+        local repo_name=$(git config --get remote.origin.url 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||')
+        if [[ -z "$repo_name" ]]; then
+            repo_name=$(basename $(git rev-parse --show-toplevel))
+        fi
+        
+        # Get worktrees and extract branch names
+        local wt_list=$(git worktree list --porcelain 2>/dev/null)
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^branch\ refs/heads/(.+)$ ]]; then
+                local branch_name="${match[1]}"
+                # Check if this worktree is in ~/workspace/worktrees
+                local wt_path="$HOME/workspace/worktrees/${repo_name}-${branch_name//\//-}"
+                if [[ -d "$wt_path" ]]; then
+                    worktree_branches+=("$branch_name")
+                fi
+            fi
+        done <<< "$wt_list"
+    fi
+    
+    # Get local branches
     branches=(${(f)"$(git branch --format='%(refname:short)' 2>/dev/null)"})
-    local remote_branches
+    
+    # Get remote branches
     remote_branches=(${(f)"$(git branch -r --format='%(refname:short)' 2>/dev/null | sed 's/origin\///' | grep -v 'HEAD')"})
     
-    local all_branches=("${branches[@]}" "${remote_branches[@]}")
-    _describe 'branch' all_branches
+    # Add worktrees with description (highest priority)
+    for branch in "${worktree_branches[@]}"; do
+        all_completions+=("$branch:existing worktree")
+    done
+    
+    # Add local branches (skip if already in worktrees)
+    for branch in "${branches[@]}"; do
+        if [[ ! " ${worktree_branches[@]} " =~ " ${branch} " ]]; then
+            all_completions+=("$branch:local branch")
+        fi
+    done
+    
+    # Add remote branches (skip if already in worktrees or local)
+    for branch in "${remote_branches[@]}"; do
+        if [[ ! " ${worktree_branches[@]} " =~ " ${branch} " ]] && \
+           [[ ! " ${branches[@]} " =~ " ${branch} " ]]; then
+            all_completions+=("$branch:remote branch")
+        fi
+    done
+    
+    _describe -t branches 'branches' all_completions
 }
 
 _wt "$@"

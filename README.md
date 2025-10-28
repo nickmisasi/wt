@@ -9,7 +9,8 @@ A powerful CLI tool to manage Git worktrees across multiple repositories, design
 - 🔄 **Smart Branch Handling**: Auto-creates tracking branches from remotes
 - 🧹 **Automatic Cleanup**: Remove stale worktrees older than 30 days
 - 💻 **Cursor Integration**: Open Cursor editor directly in worktree
-- ⚡ **Shell Completions**: Zsh auto-completions for commands and branches
+- ⚡ **Smart Completions**: Zsh auto-completions that prioritize existing worktrees
+- 🧭 **Smart Navigation**: `cd ..` from worktree root takes you to ~/workspace
 
 ## Installation
 
@@ -220,6 +221,29 @@ The installation includes a smart `cd` wrapper that makes navigation more intuit
 **All other `cd` commands** work exactly as expected.
 
 This makes worktrees feel naturally integrated into your workspace hierarchy without needing to navigate through the `worktrees/` directory.
+
+### Smart Tab Completions
+
+The zsh completions intelligently prioritize what you're most likely to want:
+
+**When you press TAB after `wt co` or `wt cursor`:**
+1. **Existing worktrees** are shown first with "(existing worktree)" label
+2. **Local branches** come next with "(local branch)" label  
+3. **Remote branches** appear last with "(remote branch)" label
+
+**Example:**
+```bash
+wt co agents-<TAB>
+# Shows:
+#   agents-prom-grafana  -- existing worktree
+#   agents-dev          -- local branch
+#   agents-staging      -- remote branch
+
+wt cursor ai-<TAB>
+# Completes to existing worktree: wt cursor ai-prom-metrics
+```
+
+This makes it fast to switch between your active worktrees without typing full branch names.
 
 ## Workflow Example
 
