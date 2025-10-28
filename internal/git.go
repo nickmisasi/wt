@@ -188,12 +188,11 @@ func (g *GitRepo) BranchExistsAnywhere(branch string) (local bool, remote bool, 
 	if err != nil {
 		return false, false, err
 	}
-	
+
 	remote, err = g.RemoteBranchExists(branch)
 	if err != nil {
 		return local, false, err
 	}
-	
+
 	return local, remote, nil
 }
-

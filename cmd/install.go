@@ -20,7 +20,16 @@ wt() {
     if echo "$output" | grep -q "^__WT_CD__:"; then
         local new_dir=$(echo "$output" | grep "^__WT_CD__:" | cut -d':' -f2-)
         cd "$new_dir" || return 1
-        echo "$output" | grep -v "^__WT_CD__:"
+        
+        # Check if there's a post-setup command to run
+        if echo "$output" | grep -q "^__WT_CMD__:"; then
+            local cmd=$(echo "$output" | grep "^__WT_CMD__:" | cut -d':' -f2-)
+            echo "Running setup: $cmd"
+            eval "$cmd"
+        fi
+        
+        # Show output without markers
+        echo "$output" | grep -v "^__WT_CD__:" | grep -v "^__WT_CMD__:"
     else
         echo "$output"
     fi

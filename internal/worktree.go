@@ -112,7 +112,7 @@ func CreateWorktree(config *Config, branch string, createBranch bool, baseBranch
 		// Use existing branch
 		cmd = exec.Command("git", "worktree", "add", worktreePath, branch)
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to create worktree: %s", string(output))

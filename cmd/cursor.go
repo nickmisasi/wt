@@ -26,6 +26,7 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranc
 
 	// Check if worktree already exists
 	exists, path := internal.WorktreeExists(cfg, branch)
+	worktreeCreated := false
 
 	if !exists {
 		// Create the worktree first
@@ -66,6 +67,7 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranc
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}
 		fmt.Printf("Worktree created at: %s\n", path)
+		worktreeCreated = true
 	}
 
 	// Open Cursor
@@ -78,6 +80,13 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranc
 
 	// Optionally also switch directory
 	fmt.Printf("%s%s\n", internal.CDMarker, path)
+	
+	// If we created a new worktree, check if there's a post-setup command
+	if worktreeCreated {
+		if postCmd := cfg.GetPostSetupCommand(path); postCmd != "" {
+			fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
+		}
+	}
 
 	return nil
 }

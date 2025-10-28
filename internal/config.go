@@ -9,6 +9,7 @@ import (
 const (
 	WorktreeBaseDir = "worktrees"
 	CDMarker        = "__WT_CD__:"
+	CMDMarker       = "__WT_CMD__:"
 )
 
 // Config holds the configuration for the worktree manager
@@ -61,5 +62,21 @@ func (c *Config) StripRepoPrefix(worktreeName string) string {
 		return strings.TrimPrefix(worktreeName, prefix)
 	}
 	return worktreeName
+}
+
+// IsMattermostRepo checks if this is the mattermost/mattermost repository
+func (c *Config) IsMattermostRepo() bool {
+	return c.RepoName == "mattermost"
+}
+
+// GetPostSetupCommand returns the command to run after creating a worktree
+// Returns empty string if no special setup is needed
+func (c *Config) GetPostSetupCommand(worktreePath string) string {
+	if c.IsMattermostRepo() {
+		// For mattermost repo, run make setup-go-work from the server directory
+		serverPath := filepath.Join(worktreePath, "server")
+		return "cd " + serverPath + " && make setup-go-work"
+	}
+	return ""
 }
 

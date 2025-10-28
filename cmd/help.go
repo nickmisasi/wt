@@ -69,14 +69,13 @@ func RunHelp() error {
 func RunDefault(config interface{}) error {
 	fmt.Print(helpText)
 	fmt.Println()
-	
+
 	// Try to list worktrees if we're in a git repo
 	err := RunList(config, false)
 	if err != nil {
 		// If we're not in a git repo, that's okay for default command
 		fmt.Fprintf(os.Stderr, "\n(Run this command from inside a git repository to see worktrees)\n")
 	}
-	
+
 	return nil
 }
-

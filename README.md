@@ -67,7 +67,16 @@ wt() {
     if echo "$output" | grep -q "^__WT_CD__:"; then
         local new_dir=$(echo "$output" | grep "^__WT_CD__:" | cut -d':' -f2-)
         cd "$new_dir" || return 1
-        echo "$output" | grep -v "^__WT_CD__:"
+        
+        # Check if there's a post-setup command to run
+        if echo "$output" | grep -q "^__WT_CMD__:"; then
+            local cmd=$(echo "$output" | grep "^__WT_CMD__:" | cut -d':' -f2-)
+            echo "Running setup: $cmd"
+            eval "$cmd"
+        fi
+        
+        # Show output without markers
+        echo "$output" | grep -v "^__WT_CD__:" | grep -v "^__WT_CMD__:"
     else
         echo "$output"
     fi
@@ -163,15 +172,25 @@ Example:
 - Branch: `MM-123`
 - Worktree path: `~/workspace/worktrees/mattermost-plugin-ai-MM-123/`
 
+### Repository-Specific Setup
+
+Some repositories require additional setup after creating a worktree. The tool automatically handles this:
+
+**Mattermost Repository (`mattermost/mattermost`):**
+- After creating a worktree, automatically runs `make setup-go-work` from the `server/` directory
+- This ensures Go workspace files are properly configured for the new worktree
+- The command runs automatically when switching to a newly created worktree
+
 ### Directory Switching
 
 The tool uses a shell function wrapper that:
 1. Captures output from the `wt` binary
 2. Detects special `__WT_CD__:<path>` marker
 3. Executes `cd <path>` in your current shell
-4. Shows remaining output
+4. Runs any post-setup commands if needed (via `__WT_CMD__` marker)
+5. Shows remaining output
 
-This provides seamless directory switching without subshell limitations.
+This provides seamless directory switching without subshell limitations, and automatically handles repository-specific setup commands.
 
 ## Workflow Example
 
