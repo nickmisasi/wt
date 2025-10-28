@@ -37,6 +37,7 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string) error {
 			return fmt.Errorf("failed to check if branch exists: %w", err)
 		}
 
+		createNewBranch := false
 		if !branchExists {
 			remoteBranchExists, err := repo.RemoteBranchExists(branch)
 			if err != nil {
@@ -49,11 +50,13 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string) error {
 				if err != nil {
 					return fmt.Errorf("failed to create tracking branch: %w", err)
 				}
+			} else {
+				createNewBranch = true
 			}
 		}
 
 		// Create the worktree
-		path, err = internal.CreateWorktree(cfg, branch)
+		path, err = internal.CreateWorktree(cfg, branch, createNewBranch)
 		if err != nil {
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}

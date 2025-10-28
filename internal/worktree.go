@@ -91,7 +91,7 @@ func getLastCommitTime(path string) time.Time {
 }
 
 // CreateWorktree creates a new worktree for the given branch
-func CreateWorktree(config *Config, branch string) (string, error) {
+func CreateWorktree(config *Config, branch string, createBranch bool) (string, error) {
 	worktreePath := config.GetWorktreePath(branch)
 
 	// Ensure the base directory exists
@@ -100,7 +100,15 @@ func CreateWorktree(config *Config, branch string) (string, error) {
 	}
 
 	// Create the worktree
-	cmd := exec.Command("git", "worktree", "add", worktreePath, branch)
+	var cmd *exec.Cmd
+	if createBranch {
+		// Create new branch
+		cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
+	} else {
+		// Use existing branch
+		cmd = exec.Command("git", "worktree", "add", worktreePath, branch)
+	}
+	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to create worktree: %s", string(output))

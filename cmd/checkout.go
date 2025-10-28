@@ -32,6 +32,7 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string) error {
 		return fmt.Errorf("failed to check if branch exists: %w", err)
 	}
 
+	createNewBranch := false
 	if !branchExists {
 		// Check if branch exists on remote
 		remoteBranchExists, err := repo.RemoteBranchExists(branch)
@@ -49,14 +50,13 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string) error {
 		} else {
 			// Branch doesn't exist anywhere, create it
 			fmt.Printf("Creating new branch: %s\n", branch)
-			// The git worktree add command with -b flag will create the branch
-			// We'll handle this in the CreateWorktree function
+			createNewBranch = true
 		}
 	}
 
 	// Create the worktree
 	fmt.Printf("Creating worktree for branch: %s\n", branch)
-	worktreePath, err := internal.CreateWorktree(cfg, branch)
+	worktreePath, err := internal.CreateWorktree(cfg, branch, createNewBranch)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}

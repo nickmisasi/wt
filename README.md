@@ -13,31 +13,64 @@ A powerful CLI tool to manage Git worktrees across multiple repositories, design
 
 ## Installation
 
-### Build from Source
+### Quick Install
 
 ```bash
-cd /Users/nickmisasi/workspace/wt
+# Clone the repository
+git clone <repo-url>
+cd wt
+
+# Build the binary
 go build -o wt
+
+# Move to PATH (choose one):
+# Option 1: System-wide (requires sudo)
 sudo mv wt /usr/local/bin/
-```
 
-### Install Shell Integration
+# Option 2: User-local (no sudo needed)
+mkdir -p ~/bin
+mv wt ~/bin/
+export PATH="$HOME/bin:$PATH"  # Add this to your .zshrc
 
-After building and moving the binary to your PATH:
-
-```bash
+# Install shell integration
 wt install
 ```
 
-This will:
-- Add a shell function to `~/.zshrc` for directory switching
-- Install zsh completions
+### What `wt install` Does
+
+The `install` command will:
+- Add a shell function to `~/.zshrc` for seamless directory switching
+- Install zsh completions for commands and branch names
 - Provide instructions for activation
 
-Then restart your terminal or run:
+After installation, restart your terminal or run:
 
 ```bash
 source ~/.zshrc
+```
+
+### Manual Installation (Alternative)
+
+If you prefer to manually add the shell function, add this to your `~/.zshrc`:
+
+```zsh
+# wt-shell-integration
+wt() {
+    local output
+    output=$(command wt "$@")
+    local exit_code=$?
+    
+    if echo "$output" | grep -q "^__WT_CD__:"; then
+        local new_dir=$(echo "$output" | grep "^__WT_CD__:" | cut -d':' -f2-)
+        cd "$new_dir" || return 1
+        echo "$output" | grep -v "^__WT_CD__:"
+    else
+        echo "$output"
+    fi
+    
+    return $exit_code
+}
+# end wt-shell-integration
 ```
 
 ## Usage
