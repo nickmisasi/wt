@@ -79,4 +79,3 @@ func (c *Config) GetPostSetupCommand(worktreePath string) string {
 	}
 	return ""
 }
-

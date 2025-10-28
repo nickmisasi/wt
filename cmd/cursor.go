@@ -80,7 +80,7 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranc
 
 	// Optionally also switch directory
 	fmt.Printf("%s%s\n", internal.CDMarker, path)
-	
+
 	// If we created a new worktree, check if there's a post-setup command
 	if worktreeCreated {
 		if postCmd := cfg.GetPostSetupCommand(path); postCmd != "" {

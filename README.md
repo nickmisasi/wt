@@ -66,7 +66,7 @@ wt() {
     
     if echo "$output" | grep -q "^__WT_CD__:"; then
         local new_dir=$(echo "$output" | grep "^__WT_CD__:" | cut -d':' -f2-)
-        cd "$new_dir" || return 1
+        builtin cd "$new_dir" || return 1
         
         # Check if there's a post-setup command to run
         if echo "$output" | grep -q "^__WT_CMD__:"; then
@@ -82,6 +82,20 @@ wt() {
     fi
     
     return $exit_code
+}
+
+# Smart cd for worktrees - makes "cd .." from worktree root go to ~/workspace
+cd() {
+    # Only intercept "cd .." from worktree root
+    if [[ "$1" == ".." ]]; then
+        local parent_dir="${PWD%/*}"  # Get parent directory
+        # Check if parent is ~/workspace/worktrees
+        if [[ "$parent_dir" == "$HOME/workspace/worktrees" ]]; then
+            builtin cd "$HOME/workspace"
+            return
+        fi
+    fi
+    builtin cd "$@"
 }
 # end wt-shell-integration
 ```
@@ -191,6 +205,21 @@ The tool uses a shell function wrapper that:
 5. Shows remaining output
 
 This provides seamless directory switching without subshell limitations, and automatically handles repository-specific setup commands.
+
+### Smart `cd` Navigation
+
+The installation includes a smart `cd` wrapper that makes navigation more intuitive:
+
+**When you're at the root of a worktree** (e.g., `~/workspace/worktrees/mattermost-MM-123/`):
+- `cd ..` → Takes you to `~/workspace` (your main workspace)
+- This treats worktrees as siblings to your main repositories
+
+**When you're in a subdirectory** (e.g., `~/workspace/worktrees/mattermost-MM-123/server/`):
+- `cd ..` → Works normally, goes to parent directory
+
+**All other `cd` commands** work exactly as expected.
+
+This makes worktrees feel naturally integrated into your workspace hierarchy without needing to navigate through the `worktrees/` directory.
 
 ## Workflow Example
 

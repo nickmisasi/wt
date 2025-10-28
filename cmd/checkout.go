@@ -67,7 +67,7 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBra
 
 	fmt.Printf("Worktree created at: %s\n", worktreePath)
 	fmt.Printf("%s%s\n", internal.CDMarker, worktreePath)
-	
+
 	// Check if there's a post-setup command for this repo
 	if postCmd := cfg.GetPostSetupCommand(worktreePath); postCmd != "" {
 		fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)

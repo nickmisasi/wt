@@ -19,7 +19,7 @@ wt() {
     
     if echo "$output" | grep -q "^__WT_CD__:"; then
         local new_dir=$(echo "$output" | grep "^__WT_CD__:" | cut -d':' -f2-)
-        cd "$new_dir" || return 1
+        builtin cd "$new_dir" || return 1
         
         # Check if there's a post-setup command to run
         if echo "$output" | grep -q "^__WT_CMD__:"; then
@@ -35,6 +35,20 @@ wt() {
     fi
     
     return $exit_code
+}
+
+# Smart cd for worktrees - makes "cd .." from worktree root go to ~/workspace
+cd() {
+    # Only intercept "cd .." from worktree root
+    if [[ "$1" == ".." ]]; then
+        local parent_dir="${PWD%%/*}"  # Get parent directory
+        # Check if parent is ~/workspace/worktrees
+        if [[ "$parent_dir" == "$HOME/workspace/worktrees" ]]; then
+            builtin cd "$HOME/workspace"
+            return
+        fi
+    fi
+    builtin cd "$@"
 }
 # end wt-shell-integration
 `
@@ -175,7 +189,7 @@ func installCompletion() (bool, error) {
 	}
 
 	completionFile := filepath.Join(targetDir, "_wt")
-	
+
 	// Check if completion already exists
 	if _, err := os.Stat(completionFile); err == nil {
 		// File exists, check if it's ours
@@ -193,4 +207,3 @@ func installCompletion() (bool, error) {
 
 	return true, nil
 }
-
