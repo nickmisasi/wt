@@ -226,24 +226,12 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 
 // createWorktreeForRepo creates a worktree from a repository
 func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath string) error {
-	// Check if branch exists
-	localExists, remoteExists, err := repo.BranchExistsAnywhere(branch)
-	if err != nil {
-		return err
-	}
+	// Check if branch exists in this specific repository using -C flag
+	localExists := checkBranchExists(repo.Root, branch)
+	remoteExists := checkRemoteBranchExists(repo.Root, branch)
 
 	var cmd *exec.Cmd
-
-	if localExists {
-		// Branch exists locally - verify it actually exists before using it
-		verifyCmd := exec.Command("git", "-C", repo.Root, "rev-parse", "--verify", branch)
-		if err := verifyCmd.Run(); err != nil {
-			// Branch doesn't actually exist despite BranchExists returning true
-			// Fall through to create new branch
-			localExists = false
-		}
-	}
-
+	
 	if localExists {
 		// Branch exists locally and is verified
 		fmt.Printf("  → Using existing local branch in %s\n", repo.Name)
@@ -264,7 +252,7 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 			}
 			baseBranch = "origin/" + baseBranch
 		}
-
+		
 		fmt.Printf("  → Creating new branch from %s in %s\n", baseBranch, repo.Name)
 		cmd = exec.Command("git", "-C", repo.Root, "worktree", "add", "-b", branch, worktreePath, baseBranch)
 	}
@@ -275,6 +263,18 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 	}
 
 	return nil
+}
+
+// checkBranchExists checks if a branch exists locally in a specific repository
+func checkBranchExists(repoPath, branch string) bool {
+	cmd := exec.Command("git", "-C", repoPath, "rev-parse", "--verify", "--quiet", branch)
+	return cmd.Run() == nil
+}
+
+// checkRemoteBranchExists checks if a branch exists on remote in a specific repository
+func checkRemoteBranchExists(repoPath, branch string) bool {
+	cmd := exec.Command("git", "-C", repoPath, "rev-parse", "--verify", "--quiet", "origin/"+branch)
+	return cmd.Run() == nil
 }
 
 // copyFilesExcept copies all files from src to dst except those in the exclusion list
