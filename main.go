@@ -73,6 +73,9 @@ func run() error {
 		branch, baseBranch := parseCheckoutArgs(args[1:])
 		return cmd.RunCursor(config, gitRepo, branch, baseBranch)
 
+	case "t", "toggle":
+		return cmd.RunToggle()
+
 	default:
 		return fmt.Errorf("unknown command: %s\nRun 'wt help' for usage information", args[0])
 	}

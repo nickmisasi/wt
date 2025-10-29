@@ -17,6 +17,7 @@ COMMANDS:
     rm <branch> [-f]             Remove a worktree for branch (use -f to force)
     clean                        Remove stale worktrees (clean, >30 days old)
     cursor <branch> [-b <base>]  Open Cursor editor for branch's worktree
+    t, toggle                    Return to parent repository from worktree
     install                      Install shell integration and completions
     help                         Show this help message
 
@@ -58,6 +59,10 @@ EXAMPLES:
     wt co MM-12345 -b master     # Create from master branch
     wt rm MM-12345               # Removes both worktrees
     wt cursor MM-12345           # Open in Cursor
+
+    # Navigation
+    cd ~/workspace/worktrees/mattermost-MM-12345/mattermost
+    wt t                         # Return to ~/workspace/mattermost
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.
