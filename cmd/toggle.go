@@ -82,4 +82,3 @@ func RunToggle() error {
 
 	return nil
 }
-

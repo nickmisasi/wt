@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/nickmisasi/wt/internal"
 )
@@ -101,12 +102,23 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 		return err
 	}
 
-	// Check if worktree already exists
+	// Determine target directory based on current repo
+	// If in mattermost repo, go to mattermost/ subdirectory
+	// If in enterprise repo, go to enterprise/ subdirectory
 	worktreePath := mc.GetMattermostWorktreePath(branch)
+	targetPath := worktreePath
+	
+	if repo.Root == mc.MattermostPath {
+		targetPath = filepath.Join(worktreePath, "mattermost")
+	} else if repo.Root == mc.EnterprisePath {
+		targetPath = filepath.Join(worktreePath, "enterprise")
+	}
+
+	// Check if worktree already exists
 	if internal.IsMattermostDualWorktree(worktreePath) {
 		// Worktree exists and is valid, just switch to it
 		fmt.Printf("Switching to existing Mattermost worktree for branch: %s\n", branch)
-		fmt.Printf("%s%s\n", internal.CDMarker, worktreePath)
+		fmt.Printf("%s%s\n", internal.CDMarker, targetPath)
 		return nil
 	}
 
@@ -157,8 +169,8 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	fmt.Printf("  - Metrics:     http://localhost:%d/metrics\n", metricsPort)
 	fmt.Printf("\n")
 
-	// Output CD marker for shell integration
-	fmt.Printf("%s%s\n", internal.CDMarker, createdPath)
+	// Output CD marker for shell integration (use intelligent target path)
+	fmt.Printf("%s%s\n", internal.CDMarker, targetPath)
 
 	// Run post-setup command
 	postCmd := fmt.Sprintf("cd %s/mattermost/server && make setup-go-work", createdPath)
