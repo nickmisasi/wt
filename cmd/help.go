@@ -20,19 +20,38 @@ COMMANDS:
     install                      Install shell integration and completions
     help                         Show this help message
 
+MATTERMOST DUAL-REPO COMMANDS:
+    co-mm, mm <branch> [opts]    Create Mattermost dual-repo worktree
+    rm-mm <branch> [opts]        Remove Mattermost dual-repo worktree
+    cursor-mm <branch> [opts]    Open Mattermost worktree in Cursor
+
 OPTIONS:
-    -b, --base <branch>    Base branch for new branches (defaults to main/master)
-    -f, --force            Force removal when using 'wt rm'
+    -b, --base <branch>         Base branch for new branches (defaults to main/master)
+    -f, --force                 Force removal when using 'wt rm' or 'wt rm-mm'
+    --port <port>               Server port for Mattermost (auto-increments by default)
+    --metrics-port <port>       Metrics port for Mattermost (auto-increments by default)
+    --delete-branch             Delete branches from repos when using 'wt rm-mm'
 
 WORKTREE STORAGE:
-    Worktrees are stored in: ~/workspace/worktrees/
-    Format: <repo-name>-<branch-name>/
+    Standard worktrees: ~/workspace/worktrees/<repo-name>-<branch-name>/
+    Mattermost dual-repo:
+        ~/workspace/worktrees/mattermost-<branch-name>/
+        ├── server/      (mattermost/mattermost worktree)
+        └── enterprise/  (mattermost/enterprise worktree)
 
-BASE BRANCH:
-    When creating a new branch that doesn't exist locally or remotely, you can
-    specify which branch to base it on using -b or --base. If not specified,
-    the tool will automatically detect and use the repository's default branch
-    (main or master).
+EXAMPLES:
+    # Standard operations
+    wt co MM-12345                      # Create worktree for branch
+    wt co feature/new -b develop        # Create from base branch
+    wt rm MM-12345                      # Remove worktree
+
+    # Mattermost dual-repo operations
+    wt co-mm MM-12345                   # Create dual worktree (auto ports)
+    wt mm MM-12345 -b master            # Create from master branch
+    wt co-mm MM-12345 --port 8070       # Create with custom ports
+    wt rm-mm MM-12345                   # Remove dual worktree
+    wt rm-mm MM-12345 --delete-branch   # Remove and delete branches from both repos
+    wt cursor-mm MM-12345               # Open in Cursor
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.

@@ -11,6 +11,7 @@ A powerful CLI tool to manage Git worktrees across multiple repositories, design
 - 💻 **Cursor Integration**: Open Cursor editor directly in worktree
 - ⚡ **Smart Completions**: Zsh auto-completions that prioritize existing worktrees
 - 🧭 **Smart Navigation**: `cd ..` from worktree root takes you to ~/workspace
+- 🔗 **Mattermost Dual-Repo**: Special support for Mattermost's dual-repository workflow
 
 ## Installation
 
@@ -277,29 +278,115 @@ wt cursor ai-<TAB>
 
 This makes it fast to switch between your active worktrees without typing full branch names.
 
-## Workflow Example
+## Mattermost Dual-Repository Workflow
+
+For developers working on Mattermost, `wt` provides special commands to manage the dual-repository setup (`mattermost/mattermost` and `mattermost/enterprise`).
+
+### Setup Requirements
+
+Ensure you have both repositories cloned:
+```bash
+~/workspace/mattermost/    # mattermost/mattermost monorepo
+~/workspace/enterprise/    # mattermost/enterprise
+```
+
+### Creating a Mattermost Dual-Repo Worktree
+
+```bash
+# Create dual-repo worktree (auto-increments ports from 8065)
+wt co-mm MM-12345
+
+# Or use the short alias
+wt mm MM-12345
+
+# Create from a specific base branch
+wt co-mm MM-12345 -b master
+
+# Specify custom ports
+wt co-mm MM-12345 --port 8070 --metrics-port 8072
+```
+
+This creates a unified worktree structure:
+```
+~/workspace/worktrees/mattermost-MM-12345/
+├── [base config files]     # CLAUDE.md, mise.toml, etc.
+├── server/                 # Worktree from mattermost repo
+│   ├── server/
+│   ├── webapp/
+│   └── ...
+└── enterprise/             # Worktree from enterprise repo
+    └── ...
+```
+
+**What it does:**
+1. Creates worktrees for both `mattermost` and `enterprise` repositories
+2. Copies base configuration files from your main mattermost repo
+3. Copies `go.work*` files and other development configurations
+4. Updates `config.json` with unique ports for the server and metrics
+5. Automatically runs `make setup-go-work` in the server directory
+6. Switches your shell to the new worktree directory
+
+### Removing Mattermost Dual-Repo Worktrees
+
+```bash
+# Standard removal
+wt rm-mm MM-12345
+
+# Force removal (for dirty worktrees)
+wt rm-mm MM-12345 -f
+
+# Remove and delete branches from both repos
+wt rm-mm MM-12345 --delete-branch
+```
+
+### Opening in Cursor
+
+```bash
+# Open existing or create new Mattermost worktree in Cursor
+wt cursor-mm MM-12345
+```
+
+## Workflow Examples
+
+### Standard Repository Workflow
 
 ```bash
 # Start in your main repository
-cd ~/workspace/mattermost-plugin-ai
+cd ~/workspace/my-project
 
-# Create worktree for ticket MM-123
-wt co MM-123
-# Now in ~/workspace/worktrees/mattermost-plugin-ai-MM-123/
+# Create worktree for ticket
+wt co feature-123
+# Now in ~/workspace/worktrees/my-project-feature-123/
 
-# Open another Cursor window for a different ticket
-wt cursor MM-456
+# Open another Cursor window for a different branch
+wt cursor feature-456
 
 # List all worktrees
 wt ls
-# Output:
-#   MM-123                          [dirty]  (last commit: today)
-#   MM-456                          [clean]  (last commit: 2 days ago)
-#   feature/old-branch              [clean]  (last commit: 45 days ago)
 
 # Clean up old worktrees
 wt clean
-# Removes feature/old-branch (>30 days old and clean)
+```
+
+### Mattermost Dual-Repo Workflow
+
+```bash
+# Start in mattermost repo
+cd ~/workspace/mattermost
+
+# Create dual-repo worktree for ticket MM-12345
+wt co-mm MM-12345
+# Now in ~/workspace/worktrees/mattermost-MM-12345/
+
+# The server runs on auto-assigned port (e.g., 8066)
+# Access at http://localhost:8066
+
+# Work on another ticket in parallel
+wt cursor-mm MM-12346
+# Server runs on different port (e.g., 8067)
+
+# Remove when done
+wt rm-mm MM-12345
 ```
 
 ## Requirements
