@@ -29,11 +29,11 @@ type FileCopyConfig struct {
 
 // Mattermost file mappings
 var mattermostServerFiles = []FileCopyConfig{
-	{"server/go.work*", "server/server/", false},
-	{"webapp/.dir-locals.el", "server/webapp/.dir-locals.el", false},
-	{"config/config.json", "server/config/config.json", false},
-	{"docker-compose.override.yaml", "server/docker-compose.override.yaml", false},
-	{"server/config.override.mk", "server/server/config.override.mk", false},
+	{"server/go.work*", "mattermost/server/", false},
+	{"webapp/.dir-locals.el", "mattermost/webapp/.dir-locals.el", false},
+	{"server/config/config.json", "mattermost/server/config/config.json", true},
+	{"docker-compose.override.yaml", "mattermost/docker-compose.override.yaml", false},
+	{"server/config.override.mk", "mattermost/server/config.override.mk", false},
 }
 
 var enterpriseFiles = []FileCopyConfig{
@@ -113,10 +113,10 @@ func (mc *MattermostConfig) GetMattermostWorktreePath(branch string) string {
 
 // IsMattermostDualWorktree checks if a path is a Mattermost dual-repo worktree
 func IsMattermostDualWorktree(worktreePath string) bool {
-	serverPath := filepath.Join(worktreePath, "server")
+	mattermostPath := filepath.Join(worktreePath, "mattermost")
 	enterprisePath := filepath.Join(worktreePath, "enterprise")
 
-	return isGitWorktree(serverPath) && isGitWorktree(enterprisePath)
+	return isGitWorktree(mattermostPath) && isGitWorktree(enterprisePath)
 }
 
 // isGitWorktree checks if a directory is a git worktree
@@ -184,10 +184,10 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 		baseBranch = mattermostRepo.GetDefaultBranch()
 	}
 
-	// Create mattermost worktree at server/
+	// Create mattermost worktree at mattermost/
 	fmt.Printf("Creating mattermost worktree for branch: %s\n", branch)
-	serverWorktreePath := filepath.Join(targetDir, "server")
-	if err := createWorktreeForRepo(mattermostRepo, branch, baseBranch, serverWorktreePath); err != nil {
+	mattermostWorktreePath := filepath.Join(targetDir, "mattermost")
+	if err := createWorktreeForRepo(mattermostRepo, branch, baseBranch, mattermostWorktreePath); err != nil {
 		cleanup()
 		return "", fmt.Errorf("failed to create mattermost worktree: %w", err)
 	}
@@ -210,7 +210,7 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 	}
 
 	// Update config.json with unique ports
-	configPath := filepath.Join(targetDir, "server", "config", "config.json")
+	configPath := filepath.Join(targetDir, "mattermost", "server", "config", "config.json")
 	if _, err := os.Stat(configPath); err == nil {
 		fmt.Printf("Configuring server ports (server: %d, metrics: %d)...\n", mc.ServerPort, mc.MetricsPort)
 		if err := updateConfigPorts(configPath, mc.ServerPort, mc.MetricsPort); err != nil {
@@ -507,12 +507,12 @@ func RemoveMattermostDualWorktree(mc *MattermostConfig, branch string, force boo
 		return fmt.Errorf("not a Mattermost dual-repo worktree: %s", worktreePath)
 	}
 
-	serverPath := filepath.Join(worktreePath, "server")
+	mattermostPath := filepath.Join(worktreePath, "mattermost")
 	enterprisePath := filepath.Join(worktreePath, "enterprise")
 
-	// Remove server worktree
+	// Remove mattermost worktree
 	fmt.Println("Removing mattermost worktree...")
-	if err := removeWorktreeFromRepo(mc.MattermostPath, serverPath, force); err != nil {
+	if err := removeWorktreeFromRepo(mc.MattermostPath, mattermostPath, force); err != nil {
 		return fmt.Errorf("failed to remove mattermost worktree: %w", err)
 	}
 
@@ -573,21 +573,25 @@ func DeleteBranchFromRepos(mc *MattermostConfig, branch string) error {
 
 // GetAvailablePorts returns available ports based on existing worktrees
 func GetAvailablePorts(existingWorktrees []WorktreeInfo) (serverPort, metricsPort int) {
-	baseServerPort := 8065
+	baseServerPort := 8066 // Start at 8066, leaving 8065 for main repo
 	maxServerPort := baseServerPort
 
 	// Find highest used port from existing worktrees
 	for _, wt := range existingWorktrees {
 		if IsMattermostDualWorktree(wt.Path) {
-			configPath := filepath.Join(wt.Path, "server", "config", "config.json")
+			configPath := filepath.Join(wt.Path, "mattermost", "server", "config", "config.json")
 			if port := extractPortFromConfig(configPath); port > maxServerPort {
 				maxServerPort = port
 			}
 		}
 	}
 
-	// Increment from highest
-	serverPort = maxServerPort + 1
+	// If we found worktrees, increment from highest; otherwise use base
+	if maxServerPort > baseServerPort {
+		serverPort = maxServerPort + 1
+	} else {
+		serverPort = baseServerPort
+	}
 	metricsPort = serverPort + 2 // Keep 2-port offset
 
 	return serverPort, metricsPort

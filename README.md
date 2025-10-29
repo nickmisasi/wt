@@ -310,7 +310,7 @@ This creates a unified worktree structure:
 ```
 ~/workspace/worktrees/mattermost-MM-12345/
 ├── [base config files]     # CLAUDE.md, mise.toml, etc.
-├── server/                 # Worktree from mattermost repo
+├── mattermost/             # Worktree from mattermost repo
 │   ├── server/
 │   ├── webapp/
 │   └── ...

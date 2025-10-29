@@ -57,7 +57,7 @@ func runMattermostRemove(mc *internal.MattermostConfig, branch string, force boo
 
 	// Show what will be removed
 	fmt.Printf("\nRemoving Mattermost dual-repo worktree:\n")
-	fmt.Printf("  - Mattermost worktree: %s/server/\n", worktreePath)
+	fmt.Printf("  - Mattermost worktree: %s/mattermost/\n", worktreePath)
 	fmt.Printf("  - Enterprise worktree: %s/enterprise/\n", worktreePath)
 	fmt.Printf("  - Directory: %s\n", worktreePath)
 	if force {

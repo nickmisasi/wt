@@ -127,12 +127,12 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 			}
 		}
 
-		// Fallback to defaults
+		// Fallback to defaults (start at 8066, reserving 8065 for main repo)
 		if serverPort == 0 {
-			serverPort = 8065
+			serverPort = 8066
 		}
 		if metricsPort == 0 {
-			metricsPort = 8067
+			metricsPort = 8068
 		}
 	}
 
@@ -150,7 +150,7 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	fmt.Printf("\nSuccessfully created Mattermost dual-repo worktree!\n")
 	fmt.Printf("\nDirectory structure:\n")
 	fmt.Printf("  %s/\n", createdPath)
-	fmt.Printf("  ├── server/      (mattermost worktree)\n")
+	fmt.Printf("  ├── mattermost/  (mattermost worktree)\n")
 	fmt.Printf("  └── enterprise/  (enterprise worktree)\n")
 	fmt.Printf("\nServer configured on:\n")
 	fmt.Printf("  - Main server: http://localhost:%d\n", serverPort)
@@ -161,7 +161,7 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	fmt.Printf("%s%s\n", internal.CDMarker, createdPath)
 
 	// Run post-setup command
-	postCmd := fmt.Sprintf("cd %s/server && make setup-go-work", createdPath)
+	postCmd := fmt.Sprintf("cd %s/mattermost/server && make setup-go-work", createdPath)
 	fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 
 	return nil

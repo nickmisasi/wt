@@ -32,7 +32,7 @@ MATTERMOST DUAL-REPOSITORY SUPPORT:
     creates dual-repo worktrees that include both mattermost and enterprise repositories:
 
         ~/workspace/worktrees/mattermost-<branch-name>/
-        ├── server/      (mattermost/mattermost worktree)
+        ├── mattermost/  (mattermost/mattermost worktree)
         └── enterprise/  (mattermost/enterprise worktree)
 
     The tool automatically:
