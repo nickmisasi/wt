@@ -31,7 +31,7 @@ type FileCopyConfig struct {
 var mattermostServerFiles = []FileCopyConfig{
 	{"server/go.work*", "server/server/", false},
 	{"webapp/.dir-locals.el", "server/webapp/.dir-locals.el", false},
-	{"config/config.json", "server/config/config.json", true},
+	{"config/config.json", "server/config/config.json", false},
 	{"docker-compose.override.yaml", "server/docker-compose.override.yaml", false},
 	{"server/config.override.mk", "server/server/config.override.mk", false},
 }
@@ -233,7 +233,7 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 	}
 
 	var cmd *exec.Cmd
-	
+
 	if localExists {
 		// Branch exists locally - verify it actually exists before using it
 		verifyCmd := exec.Command("git", "-C", repo.Root, "rev-parse", "--verify", branch)
@@ -243,7 +243,7 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 			localExists = false
 		}
 	}
-	
+
 	if localExists {
 		// Branch exists locally and is verified
 		fmt.Printf("  → Using existing local branch in %s\n", repo.Name)
@@ -264,7 +264,7 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 			}
 			baseBranch = "origin/" + baseBranch
 		}
-		
+
 		fmt.Printf("  → Creating new branch from %s in %s\n", baseBranch, repo.Name)
 		cmd = exec.Command("git", "-C", repo.Root, "worktree", "add", "-b", branch, worktreePath, baseBranch)
 	}
