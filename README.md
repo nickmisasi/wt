@@ -139,17 +139,21 @@ wt co <branch> [-b <base-branch>]
 - If not, creates the worktree and switches to it
 - If branch doesn't exist locally but exists on remote, creates a tracking branch
 - If branch doesn't exist anywhere, creates a new branch from base branch (defaults to main/master)
+- **Automatic Mattermost Detection**: When run from `~/workspace/mattermost` or `~/workspace/enterprise`, automatically creates dual-repo worktrees
 
 Examples:
 ```bash
-# Create worktree from default branch
+# Standard repository
+wt co feature-123
+# Creates worktree at ~/workspace/worktrees/my-project-feature-123/
+
+# Mattermost repository (automatic dual-repo!)
+cd ~/workspace/mattermost
 wt co MM-123
-# Creates worktree at ~/workspace/worktrees/mattermost-plugin-ai-MM-123/
-# Automatically switches to that directory
+# Creates dual worktree and switches to ~/workspace/worktrees/mattermost-MM-123/mattermost/
 
 # Create worktree from specific base branch
 wt co feature/new-ui -b develop
-# Creates new branch 'feature/new-ui' based on 'develop' branch
 
 # Create worktree from release branch
 wt co hotfix/urgent-fix --base release-1.0
@@ -199,6 +203,34 @@ wt cursor MM-123
 wt cursor feature/experiment -b develop
 ```
 
+### Toggle Back to Parent Repository
+
+```bash
+wt t
+# or
+wt toggle
+```
+
+Returns you to the parent repository from any worktree. Intelligently detects which repository to return to based on your current location.
+
+Examples:
+```bash
+# From a standard worktree
+cd ~/workspace/worktrees/my-project-feature/src
+wt t
+# Takes you to ~/workspace/my-project
+
+# From Mattermost dual-repo worktree
+cd ~/workspace/worktrees/mattermost-MM-123/mattermost/server
+wt t
+# Takes you to ~/workspace/mattermost
+
+# From enterprise worktree
+cd ~/workspace/worktrees/mattermost-MM-123/enterprise
+wt t
+# Takes you to ~/workspace/enterprise
+```
+
 ### Show Help
 
 ```bash
@@ -225,8 +257,10 @@ Example:
 Some repositories require additional setup after creating a worktree. The tool automatically handles this:
 
 **Mattermost Repository (`mattermost/mattermost`):**
-- After creating a worktree, automatically runs `make setup-go-work` from the `server/` directory
-- This ensures Go workspace files are properly configured for the new worktree
+- Automatically detects when you're in the mattermost or enterprise repository
+- Creates dual-repo worktrees with both mattermost and enterprise
+- After creating a worktree, automatically runs `make setup-go-work` from the `mattermost/server/` directory
+- Configures unique ports for each worktree (starts at 8066, auto-increments)
 - The command runs automatically when switching to a newly created worktree
 
 ### Directory Switching
@@ -280,7 +314,7 @@ This makes it fast to switch between your active worktrees without typing full b
 
 ## Mattermost Dual-Repository Workflow
 
-For developers working on Mattermost, `wt` provides special commands to manage the dual-repository setup (`mattermost/mattermost` and `mattermost/enterprise`).
+For developers working on Mattermost, `wt` **automatically detects** when you're in the mattermost repository and creates dual-repo worktrees using the standard commands - no special commands needed!
 
 ### Setup Requirements
 
@@ -292,18 +326,21 @@ Ensure you have both repositories cloned:
 
 ### Creating a Mattermost Dual-Repo Worktree
 
-```bash
-# Create dual-repo worktree (auto-increments ports from 8065)
-wt co-mm MM-12345
+Just use the regular `wt co` command from the mattermost or enterprise repository:
 
-# Or use the short alias
-wt mm MM-12345
+```bash
+# From mattermost repo - automatically creates dual worktree
+cd ~/workspace/mattermost
+wt co MM-12345
+# Automatically drops you into: ~/workspace/worktrees/mattermost-MM-12345/mattermost/
+
+# From enterprise repo - same dual worktree, different landing directory
+cd ~/workspace/enterprise
+wt co MM-12345
+# Automatically drops you into: ~/workspace/worktrees/mattermost-MM-12345/enterprise/
 
 # Create from a specific base branch
-wt co-mm MM-12345 -b master
-
-# Specify custom ports
-wt co-mm MM-12345 --port 8070 --metrics-port 8072
+wt co MM-12345 -b master
 ```
 
 This creates a unified worktree structure:
@@ -318,32 +355,44 @@ This creates a unified worktree structure:
     └── ...
 ```
 
-**What it does:**
-1. Creates worktrees for both `mattermost` and `enterprise` repositories
-2. Copies base configuration files from your main mattermost repo
-3. Copies `go.work*` files and other development configurations
-4. Updates `config.json` with unique ports for the server and metrics
-5. Automatically runs `make setup-go-work` in the server directory
-6. Switches your shell to the new worktree directory
+**What it automatically does:**
+1. Detects you're in the mattermost or enterprise repository
+2. Creates worktrees for both `mattermost` and `enterprise` repositories
+3. Copies base configuration files from your main mattermost repo
+4. Copies `go.work*` files and other development configurations
+5. Updates `config.json` with unique ports (starts at 8066, auto-increments)
+6. Automatically runs `make setup-go-work` in the server directory
+7. Switches to the appropriate subdirectory based on which repo you started from
 
 ### Removing Mattermost Dual-Repo Worktrees
 
+Again, just use the standard command:
+
 ```bash
-# Standard removal
-wt rm-mm MM-12345
+# Standard removal - automatically detects and removes from both repos
+wt rm MM-12345
 
 # Force removal (for dirty worktrees)
-wt rm-mm MM-12345 -f
-
-# Remove and delete branches from both repos
-wt rm-mm MM-12345 --delete-branch
+wt rm MM-12345 -f
 ```
 
 ### Opening in Cursor
 
 ```bash
 # Open existing or create new Mattermost worktree in Cursor
-wt cursor-mm MM-12345
+wt cursor MM-12345
+```
+
+### Toggle Between Worktree and Parent Repository
+
+```bash
+# Return to parent repository from anywhere in a worktree
+wt t
+
+# Example:
+cd ~/workspace/worktrees/mattermost-MM-12345/mattermost/server
+wt t
+# Takes you back to ~/workspace/mattermost
 ```
 
 ## Workflow Examples
@@ -374,19 +423,24 @@ wt clean
 # Start in mattermost repo
 cd ~/workspace/mattermost
 
-# Create dual-repo worktree for ticket MM-12345
-wt co-mm MM-12345
-# Now in ~/workspace/worktrees/mattermost-MM-12345/
+# Create dual-repo worktree for ticket MM-12345 (uses standard command!)
+wt co MM-12345
+# Now in ~/workspace/worktrees/mattermost-MM-12345/mattermost/
+# Automatically created worktrees in both mattermost and enterprise repos
 
 # The server runs on auto-assigned port (e.g., 8066)
 # Access at http://localhost:8066
 
 # Work on another ticket in parallel
-wt cursor-mm MM-12346
-# Server runs on different port (e.g., 8067)
+wt cursor MM-12346
+# Server runs on different port (e.g., 8069)
 
-# Remove when done
-wt rm-mm MM-12345
+# Toggle back to main repo
+wt t
+# Back in ~/workspace/mattermost
+
+# Remove when done (standard command automatically removes both worktrees)
+wt rm MM-12345
 ```
 
 ## Requirements
