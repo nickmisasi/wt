@@ -173,8 +173,8 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	// Output CD marker for shell integration (use intelligent target path)
 	fmt.Printf("%s%s\n", internal.CDMarker, targetPath)
 
-	// Run post-setup command
-	postCmd := fmt.Sprintf("cd %s/mattermost-%s/server && make setup-go-work", createdPath, sanitizedBranch)
+	// Run post-setup command (use symlink path for compatibility)
+	postCmd := fmt.Sprintf("cd %s/mattermost/server && make setup-go-work", createdPath)
 	fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 
 	return nil

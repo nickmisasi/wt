@@ -242,6 +242,22 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 	}
 	enterpriseWorktreeCreated = true
 
+	// Create symlinks for compatibility with make and other scripts
+	// These allow scripts that reference ../../enterprise to still work
+	fmt.Println("Creating compatibility symlinks...")
+	mattermostSymlink := filepath.Join(targetDir, "mattermost")
+	enterpriseSymlink := filepath.Join(targetDir, "enterprise")
+	
+	if err := os.Symlink("mattermost-"+sanitizedBranch, mattermostSymlink); err != nil {
+		cleanup()
+		return "", fmt.Errorf("failed to create mattermost symlink: %w", err)
+	}
+	
+	if err := os.Symlink("enterprise-"+sanitizedBranch, enterpriseSymlink); err != nil {
+		cleanup()
+		return "", fmt.Errorf("failed to create enterprise symlink: %w", err)
+	}
+
 	// Copy additional files
 	fmt.Println("Copying additional configuration files...")
 	if err := copyMattermostFiles(mc, targetDir, sanitizedBranch); err != nil {

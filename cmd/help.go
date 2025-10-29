@@ -34,7 +34,9 @@ MATTERMOST DUAL-REPOSITORY SUPPORT:
 
         ~/workspace/worktrees/mattermost-<branch-name>/
         ├── mattermost-<branch-name>/  (mattermost/mattermost worktree)
-        └── enterprise-<branch-name>/  (mattermost/enterprise worktree)
+        ├── enterprise-<branch-name>/  (mattermost/enterprise worktree)
+        ├── mattermost -> mattermost-<branch-name>/  (symlink for scripts)
+        └── enterprise -> enterprise-<branch-name>/  (symlink for scripts)
 
     The tool automatically:
     - Detects when you're in the mattermost repository

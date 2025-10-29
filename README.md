@@ -351,11 +351,15 @@ This creates a unified worktree structure:
 │   ├── server/
 │   ├── webapp/
 │   └── ...
-└── enterprise-MM-12345/         # Worktree from enterprise repo
-    └── ...
+├── enterprise-MM-12345/         # Worktree from enterprise repo
+│   └── ...
+├── mattermost -> mattermost-MM-12345/  # Symlink for make scripts
+└── enterprise -> enterprise-MM-12345/  # Symlink for make scripts
 ```
 
-**Note:** The subdirectories include the branch name (e.g., `mattermost-MM-12345`) so that each Cursor window has a unique title, making it easy to distinguish between multiple worktrees.
+**Note:** 
+- The subdirectories include the branch name (e.g., `mattermost-MM-12345`) so that each Cursor window has a unique title, making it easy to distinguish between multiple worktrees.
+- Symlinks (`mattermost` and `enterprise`) are created for compatibility with Mattermost's build scripts that reference `../../enterprise`.
 
 **What it automatically does:**
 1. Detects you're in the mattermost or enterprise repository
