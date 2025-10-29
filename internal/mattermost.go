@@ -46,16 +46,16 @@ func IsMattermostRepo(repo *GitRepo) bool {
 	if repo.Name != "mattermost" {
 		return false
 	}
-	
+
 	// Additional validation: check if enterprise repo exists alongside it
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return false
 	}
-	
+
 	workspaceRoot := filepath.Join(homeDir, "workspace")
 	enterprisePath := filepath.Join(workspaceRoot, "enterprise")
-	
+
 	// If enterprise repo exists, this is definitely the mattermost setup
 	return isGitRepo(enterprisePath)
 }
@@ -233,10 +233,20 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 	}
 
 	var cmd *exec.Cmd
-
+	
 	if localExists {
-		// Branch exists locally
-		fmt.Printf("  → Branch exists locally in %s\n", repo.Name)
+		// Branch exists locally - verify it actually exists before using it
+		verifyCmd := exec.Command("git", "-C", repo.Root, "rev-parse", "--verify", branch)
+		if err := verifyCmd.Run(); err != nil {
+			// Branch doesn't actually exist despite BranchExists returning true
+			// Fall through to create new branch
+			localExists = false
+		}
+	}
+	
+	if localExists {
+		// Branch exists locally and is verified
+		fmt.Printf("  → Using existing local branch in %s\n", repo.Name)
 		cmd = exec.Command("git", "-C", repo.Root, "worktree", "add", worktreePath, branch)
 	} else if remoteExists {
 		// Branch exists on remote - create tracking branch
@@ -244,6 +254,17 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 		cmd = exec.Command("git", "-C", repo.Root, "worktree", "add", "--track", "-b", branch, worktreePath, "origin/"+branch)
 	} else {
 		// Branch doesn't exist - create new branch from base
+		// Verify base branch exists
+		verifyBaseCmd := exec.Command("git", "-C", repo.Root, "rev-parse", "--verify", baseBranch)
+		if err := verifyBaseCmd.Run(); err != nil {
+			// Base branch doesn't exist locally, try origin/baseBranch
+			verifyOriginBaseCmd := exec.Command("git", "-C", repo.Root, "rev-parse", "--verify", "origin/"+baseBranch)
+			if err := verifyOriginBaseCmd.Run(); err != nil {
+				return fmt.Errorf("base branch '%s' not found in %s (tried local and origin/%s)", baseBranch, repo.Name, baseBranch)
+			}
+			baseBranch = "origin/" + baseBranch
+		}
+		
 		fmt.Printf("  → Creating new branch from %s in %s\n", baseBranch, repo.Name)
 		cmd = exec.Command("git", "-C", repo.Root, "worktree", "add", "-b", branch, worktreePath, baseBranch)
 	}

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/nickmisasi/wt/internal"
 )
@@ -104,8 +103,8 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 
 	// Check if worktree already exists
 	worktreePath := mc.GetMattermostWorktreePath(branch)
-	if _, err := os.Stat(worktreePath); err == nil {
-		// Worktree exists, just switch to it
+	if internal.IsMattermostDualWorktree(worktreePath) {
+		// Worktree exists and is valid, just switch to it
 		fmt.Printf("Switching to existing Mattermost worktree for branch: %s\n", branch)
 		fmt.Printf("%s%s\n", internal.CDMarker, worktreePath)
 		return nil
@@ -127,7 +126,7 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 				}
 			}
 		}
-		
+
 		// Fallback to defaults
 		if serverPort == 0 {
 			serverPort = 8065

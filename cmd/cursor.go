@@ -130,7 +130,7 @@ func runMattermostCursor(repo *internal.GitRepo, branch string, baseBranch strin
 
 	// Open in Cursor
 	fmt.Printf("Opening Cursor for branch: %s\n", branch)
-	
+
 	cmd := exec.Command("cursor", worktreePath)
 	err = cmd.Start()
 	if err != nil {
