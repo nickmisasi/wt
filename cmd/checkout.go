@@ -103,15 +103,16 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	}
 
 	// Determine target directory based on current repo
-	// If in mattermost repo, go to mattermost/ subdirectory
-	// If in enterprise repo, go to enterprise/ subdirectory
+	// If in mattermost repo, go to mattermost-<branch>/ subdirectory
+	// If in enterprise repo, go to enterprise-<branch>/ subdirectory
 	worktreePath := mc.GetMattermostWorktreePath(branch)
+	sanitizedBranch := internal.SanitizeBranchName(branch)
 	targetPath := worktreePath
-
+	
 	if repo.Root == mc.MattermostPath {
-		targetPath = filepath.Join(worktreePath, "mattermost")
+		targetPath = filepath.Join(worktreePath, "mattermost-"+sanitizedBranch)
 	} else if repo.Root == mc.EnterprisePath {
-		targetPath = filepath.Join(worktreePath, "enterprise")
+		targetPath = filepath.Join(worktreePath, "enterprise-"+sanitizedBranch)
 	}
 
 	// Check if worktree already exists
@@ -162,8 +163,8 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	fmt.Printf("\nSuccessfully created Mattermost dual-repo worktree!\n")
 	fmt.Printf("\nDirectory structure:\n")
 	fmt.Printf("  %s/\n", createdPath)
-	fmt.Printf("  ├── mattermost/  (mattermost worktree)\n")
-	fmt.Printf("  └── enterprise/  (enterprise worktree)\n")
+	fmt.Printf("  ├── mattermost-%s/  (mattermost worktree)\n", sanitizedBranch)
+	fmt.Printf("  └── enterprise-%s/  (enterprise worktree)\n", sanitizedBranch)
 	fmt.Printf("\nServer configured on:\n")
 	fmt.Printf("  - Main server: http://localhost:%d\n", serverPort)
 	fmt.Printf("  - Metrics:     http://localhost:%d/metrics\n", metricsPort)
@@ -173,7 +174,7 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	fmt.Printf("%s%s\n", internal.CDMarker, targetPath)
 
 	// Run post-setup command
-	postCmd := fmt.Sprintf("cd %s/mattermost/server && make setup-go-work", createdPath)
+	postCmd := fmt.Sprintf("cd %s/mattermost-%s/server && make setup-go-work", createdPath, sanitizedBranch)
 	fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 
 	return nil

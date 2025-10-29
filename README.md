@@ -150,7 +150,7 @@ wt co feature-123
 # Mattermost repository (automatic dual-repo!)
 cd ~/workspace/mattermost
 wt co MM-123
-# Creates dual worktree and switches to ~/workspace/worktrees/mattermost-MM-123/mattermost/
+# Creates dual worktree and switches to ~/workspace/worktrees/mattermost-MM-123/mattermost-MM-123/
 
 # Create worktree from specific base branch
 wt co feature/new-ui -b develop
@@ -221,12 +221,12 @@ wt t
 # Takes you to ~/workspace/my-project
 
 # From Mattermost dual-repo worktree
-cd ~/workspace/worktrees/mattermost-MM-123/mattermost/server
+cd ~/workspace/worktrees/mattermost-MM-123/mattermost-MM-123/server
 wt t
 # Takes you to ~/workspace/mattermost
 
 # From enterprise worktree
-cd ~/workspace/worktrees/mattermost-MM-123/enterprise
+cd ~/workspace/worktrees/mattermost-MM-123/enterprise-MM-123
 wt t
 # Takes you to ~/workspace/enterprise
 ```
@@ -332,12 +332,12 @@ Just use the regular `wt co` command from the mattermost or enterprise repositor
 # From mattermost repo - automatically creates dual worktree
 cd ~/workspace/mattermost
 wt co MM-12345
-# Automatically drops you into: ~/workspace/worktrees/mattermost-MM-12345/mattermost/
+# Automatically drops you into: ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345/
 
 # From enterprise repo - same dual worktree, different landing directory
 cd ~/workspace/enterprise
 wt co MM-12345
-# Automatically drops you into: ~/workspace/worktrees/mattermost-MM-12345/enterprise/
+# Automatically drops you into: ~/workspace/worktrees/mattermost-MM-12345/enterprise-MM-12345/
 
 # Create from a specific base branch
 wt co MM-12345 -b master
@@ -346,14 +346,16 @@ wt co MM-12345 -b master
 This creates a unified worktree structure:
 ```
 ~/workspace/worktrees/mattermost-MM-12345/
-├── [base config files]     # CLAUDE.md, mise.toml, etc.
-├── mattermost/             # Worktree from mattermost repo
+├── [base config files]          # CLAUDE.md, mise.toml, etc.
+├── mattermost-MM-12345/         # Worktree from mattermost repo
 │   ├── server/
 │   ├── webapp/
 │   └── ...
-└── enterprise/             # Worktree from enterprise repo
+└── enterprise-MM-12345/         # Worktree from enterprise repo
     └── ...
 ```
+
+**Note:** The subdirectories include the branch name (e.g., `mattermost-MM-12345`) so that each Cursor window has a unique title, making it easy to distinguish between multiple worktrees.
 
 **What it automatically does:**
 1. Detects you're in the mattermost or enterprise repository
@@ -390,7 +392,7 @@ wt cursor MM-12345
 wt t
 
 # Example:
-cd ~/workspace/worktrees/mattermost-MM-12345/mattermost/server
+cd ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345/server
 wt t
 # Takes you back to ~/workspace/mattermost
 ```
@@ -425,7 +427,7 @@ cd ~/workspace/mattermost
 
 # Create dual-repo worktree for ticket MM-12345 (uses standard command!)
 wt co MM-12345
-# Now in ~/workspace/worktrees/mattermost-MM-12345/mattermost/
+# Now in ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345/
 # Automatically created worktrees in both mattermost and enterprise repos
 
 # The server runs on auto-assigned port (e.g., 8066)

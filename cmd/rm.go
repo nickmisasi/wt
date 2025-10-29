@@ -54,11 +54,12 @@ func runStandardRemove(cfg *internal.Config, branch string, force bool) error {
 // runMattermostRemove handles Mattermost dual-repo worktree removal
 func runMattermostRemove(mc *internal.MattermostConfig, branch string, force bool) error {
 	worktreePath := mc.GetMattermostWorktreePath(branch)
+	sanitizedBranch := internal.SanitizeBranchName(branch)
 
 	// Show what will be removed
 	fmt.Printf("\nRemoving Mattermost dual-repo worktree:\n")
-	fmt.Printf("  - Mattermost worktree: %s/mattermost/\n", worktreePath)
-	fmt.Printf("  - Enterprise worktree: %s/enterprise/\n", worktreePath)
+	fmt.Printf("  - Mattermost worktree: %s/mattermost-%s/\n", worktreePath, sanitizedBranch)
+	fmt.Printf("  - Enterprise worktree: %s/enterprise-%s/\n", worktreePath, sanitizedBranch)
 	fmt.Printf("  - Directory: %s\n", worktreePath)
 	if force {
 		fmt.Println("Using --force (-f)")

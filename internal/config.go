@@ -33,13 +33,13 @@ func NewConfig() (*Config, error) {
 
 // GetWorktreePath returns the full path for a worktree given a branch name
 func (c *Config) GetWorktreePath(branch string) string {
-	sanitized := sanitizeBranchName(branch)
+	sanitized := SanitizeBranchName(branch)
 	worktreeName := c.RepoName + "-" + sanitized
 	return filepath.Join(c.WorktreeBasePath, worktreeName)
 }
 
-// sanitizeBranchName removes or replaces characters that are problematic in filesystem paths
-func sanitizeBranchName(branch string) string {
+// SanitizeBranchName removes or replaces characters that are problematic in filesystem paths
+func SanitizeBranchName(branch string) string {
 	// Replace common problematic characters
 	replacer := strings.NewReplacer(
 		"/", "-",

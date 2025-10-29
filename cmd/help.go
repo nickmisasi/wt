@@ -33,8 +33,8 @@ MATTERMOST DUAL-REPOSITORY SUPPORT:
     creates dual-repo worktrees that include both mattermost and enterprise repositories:
 
         ~/workspace/worktrees/mattermost-<branch-name>/
-        ├── mattermost/  (mattermost/mattermost worktree)
-        └── enterprise/  (mattermost/enterprise worktree)
+        ├── mattermost-<branch-name>/  (mattermost/mattermost worktree)
+        └── enterprise-<branch-name>/  (mattermost/enterprise worktree)
 
     The tool automatically:
     - Detects when you're in the mattermost repository
@@ -61,7 +61,7 @@ EXAMPLES:
     wt cursor MM-12345           # Open in Cursor
 
     # Navigation
-    cd ~/workspace/worktrees/mattermost-MM-12345/mattermost
+    cd ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345
     wt t                         # Return to ~/workspace/mattermost
 
 INSTALLATION:
