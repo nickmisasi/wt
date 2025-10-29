@@ -171,16 +171,31 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 		return targetDir, fmt.Errorf("worktree directory already exists: %s", targetDir)
 	}
 
+	// Calculate paths upfront
+	sanitizedBranch := SanitizeBranchName(branch)
+	mattermostWorktreePath := filepath.Join(targetDir, "mattermost-"+sanitizedBranch)
+	enterpriseWorktreePath := filepath.Join(targetDir, "enterprise-"+sanitizedBranch)
+
+	// Prune any orphaned worktree references before starting
+	// This handles the case where a previous creation failed
+	exec.Command("git", "-C", mc.MattermostPath, "worktree", "prune").Run()
+	exec.Command("git", "-C", mc.EnterprisePath, "worktree", "prune").Run()
+
 	// Track what we've created for cleanup
 	var serverWorktreeCreated, enterpriseWorktreeCreated bool
 
 	cleanup := func() {
+		// Remove worktrees from git
 		if serverWorktreeCreated {
-			removeWorktreeFromRepo(mc.MattermostPath, filepath.Join(targetDir, "server"), true)
+			removeWorktreeFromRepo(mc.MattermostPath, mattermostWorktreePath, true)
 		}
 		if enterpriseWorktreeCreated {
-			removeWorktreeFromRepo(mc.EnterprisePath, filepath.Join(targetDir, "enterprise"), true)
+			removeWorktreeFromRepo(mc.EnterprisePath, enterpriseWorktreePath, true)
 		}
+		// Always prune to clean up git's internal state
+		exec.Command("git", "-C", mc.MattermostPath, "worktree", "prune").Run()
+		exec.Command("git", "-C", mc.EnterprisePath, "worktree", "prune").Run()
+		// Remove directory
 		if targetDir != "" {
 			os.RemoveAll(targetDir)
 		}
@@ -209,8 +224,6 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 
 	// Create mattermost worktree at mattermost-<branch>/
 	fmt.Printf("Creating mattermost worktree for branch: %s\n", branch)
-	sanitizedBranch := SanitizeBranchName(branch)
-	mattermostWorktreePath := filepath.Join(targetDir, "mattermost-"+sanitizedBranch)
 	if err := createWorktreeForRepo(mattermostRepo, branch, baseBranch, mattermostWorktreePath); err != nil {
 		cleanup()
 		return "", fmt.Errorf("failed to create mattermost worktree: %w", err)
@@ -219,9 +232,12 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 
 	// Create enterprise worktree at enterprise-<branch>/
 	fmt.Printf("Creating enterprise worktree for branch: %s\n", branch)
-	enterpriseWorktreePath := filepath.Join(targetDir, "enterprise-"+sanitizedBranch)
 	if err := createWorktreeForRepo(enterpriseRepo, branch, baseBranch, enterpriseWorktreePath); err != nil {
 		cleanup()
+		// Check if this is an "already used by worktree" error
+		if strings.Contains(err.Error(), "already used by worktree") {
+			return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd ~/workspace/enterprise\n  git worktree prune\n\nThen try again", err)
+		}
 		return "", fmt.Errorf("failed to create enterprise worktree: %w", err)
 	}
 	enterpriseWorktreeCreated = true
@@ -633,7 +649,7 @@ func GetAvailablePorts(existingWorktrees []WorktreeInfo) (serverPort, metricsPor
 			if err != nil {
 				continue
 			}
-			
+
 			for _, entry := range entries {
 				if entry.IsDir() && strings.HasPrefix(entry.Name(), "mattermost-") {
 					configPath := filepath.Join(wt.Path, entry.Name(), "server", "config", "config.json")

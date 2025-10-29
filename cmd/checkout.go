@@ -108,7 +108,7 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	worktreePath := mc.GetMattermostWorktreePath(branch)
 	sanitizedBranch := internal.SanitizeBranchName(branch)
 	targetPath := worktreePath
-	
+
 	if repo.Root == mc.MattermostPath {
 		targetPath = filepath.Join(worktreePath, "mattermost-"+sanitizedBranch)
 	} else if repo.Root == mc.EnterprisePath {
