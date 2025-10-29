@@ -107,7 +107,7 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	// If in enterprise repo, go to enterprise/ subdirectory
 	worktreePath := mc.GetMattermostWorktreePath(branch)
 	targetPath := worktreePath
-	
+
 	if repo.Root == mc.MattermostPath {
 		targetPath = filepath.Join(worktreePath, "mattermost")
 	} else if repo.Root == mc.EnterprisePath {
