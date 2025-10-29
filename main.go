@@ -73,27 +73,6 @@ func run() error {
 		branch, baseBranch := parseCheckoutArgs(args[1:])
 		return cmd.RunCursor(config, gitRepo, branch, baseBranch)
 
-	case "co-mm", "mm", "mattermost":
-		if len(args) < 2 {
-			return fmt.Errorf("usage: wt co-mm <branch> [-b|--base <base-branch>] [--port <port>] [--metrics-port <port>]")
-		}
-		branch, baseBranch, serverPort, metricsPort := parseMattermostArgs(args[1:])
-		return cmd.RunMattermostCheckout(branch, baseBranch, serverPort, metricsPort)
-
-	case "rm-mm":
-		if len(args) < 2 {
-			return fmt.Errorf("usage: wt rm-mm <branch> [-f|--force] [--delete-branch]")
-		}
-		branch, force, deleteBranch := parseMattermostRemoveArgs(args[1:])
-		return cmd.RunMattermostRemove(branch, force, deleteBranch)
-
-	case "cursor-mm":
-		if len(args) < 2 {
-			return fmt.Errorf("usage: wt cursor-mm <branch> [-b|--base <base-branch>] [--port <port>] [--metrics-port <port>]")
-		}
-		branch, baseBranch, serverPort, metricsPort := parseMattermostArgs(args[1:])
-		return cmd.RunMattermostCursor(branch, baseBranch, serverPort, metricsPort)
-
 	default:
 		return fmt.Errorf("unknown command: %s\nRun 'wt help' for usage information", args[0])
 	}

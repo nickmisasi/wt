@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/nickmisasi/wt/internal"
@@ -24,6 +25,17 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranc
 		return fmt.Errorf("cursor command not found. Please install Cursor CLI first")
 	}
 
+	// Check if this is the mattermost repository
+	if internal.IsMattermostRepo(repo) {
+		return runMattermostCursor(repo, branch, baseBranch)
+	}
+
+	// Standard worktree cursor workflow
+	return runStandardCursor(cfg, repo, config, gitRepo, branch, baseBranch)
+}
+
+// runStandardCursor handles standard single-repo cursor opening
+func runStandardCursor(cfg *internal.Config, repo *internal.GitRepo, config interface{}, gitRepo interface{}, branch string, baseBranch string) error {
 	// Check if worktree already exists
 	exists, path := internal.WorktreeExists(cfg, branch)
 	worktreeCreated := false
@@ -87,6 +99,46 @@ func RunCursor(config interface{}, gitRepo interface{}, branch string, baseBranc
 			fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 		}
 	}
+
+	return nil
+}
+
+// runMattermostCursor handles Mattermost dual-repo cursor opening
+func runMattermostCursor(repo *internal.GitRepo, branch string, baseBranch string) error {
+	mc, err := internal.NewMattermostConfig()
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	// Validate setup
+	if err := mc.ValidateMattermostSetup(); err != nil {
+		return err
+	}
+
+	worktreePath := mc.GetMattermostWorktreePath(branch)
+
+	// Check if worktree exists
+	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+		// Create it first
+		fmt.Printf("Worktree doesn't exist for branch '%s'. Creating it...\n\n", branch)
+		if err := runMattermostCheckout(repo, branch, baseBranch, 0, 0); err != nil {
+			return err
+		}
+		// Refresh the worktree path
+		worktreePath = mc.GetMattermostWorktreePath(branch)
+	}
+
+	// Open in Cursor
+	fmt.Printf("Opening Cursor for branch: %s\n", branch)
+	
+	cmd := exec.Command("cursor", worktreePath)
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("failed to open Cursor: %w", err)
+	}
+
+	// Switch directory
+	fmt.Printf("%s%s\n", internal.CDMarker, worktreePath)
 
 	return nil
 }

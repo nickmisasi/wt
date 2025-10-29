@@ -18,6 +18,21 @@ func RunRemove(config interface{}, branch string, force bool) error {
 		return fmt.Errorf("usage: wt rm <branch> [-f|--force]")
 	}
 
+	// Check if this is a Mattermost dual-repo worktree
+	mc, err := internal.NewMattermostConfig()
+	if err == nil {
+		worktreePath := mc.GetMattermostWorktreePath(branch)
+		if internal.IsMattermostDualWorktree(worktreePath) {
+			return runMattermostRemove(mc, branch, force)
+		}
+	}
+
+	// Standard worktree removal
+	return runStandardRemove(cfg, branch, force)
+}
+
+// runStandardRemove handles standard single-repo worktree removal
+func runStandardRemove(cfg *internal.Config, branch string, force bool) error {
 	wt, err := internal.GetWorktreeByBranch(cfg, branch)
 	if err != nil {
 		return fmt.Errorf("worktree not found for branch: %s", branch)
@@ -33,5 +48,28 @@ func RunRemove(config interface{}, branch string, force bool) error {
 	}
 
 	fmt.Println("✓ Worktree removed")
+	return nil
+}
+
+// runMattermostRemove handles Mattermost dual-repo worktree removal
+func runMattermostRemove(mc *internal.MattermostConfig, branch string, force bool) error {
+	worktreePath := mc.GetMattermostWorktreePath(branch)
+
+	// Show what will be removed
+	fmt.Printf("\nRemoving Mattermost dual-repo worktree:\n")
+	fmt.Printf("  - Mattermost worktree: %s/server/\n", worktreePath)
+	fmt.Printf("  - Enterprise worktree: %s/enterprise/\n", worktreePath)
+	fmt.Printf("  - Directory: %s\n", worktreePath)
+	if force {
+		fmt.Println("Using --force (-f)")
+	}
+	fmt.Println()
+
+	// Remove the worktree
+	if err := internal.RemoveMattermostDualWorktree(mc, branch, force); err != nil {
+		return err
+	}
+
+	fmt.Println("✓ Mattermost worktree removed")
 	return nil
 }

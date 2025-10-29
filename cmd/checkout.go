@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/nickmisasi/wt/internal"
 )
@@ -18,6 +19,18 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBra
 		return fmt.Errorf("invalid git repo type")
 	}
 
+	// Check if this is the mattermost repository
+	if internal.IsMattermostRepo(repo) {
+		// Use Mattermost dual-repo workflow
+		return runMattermostCheckout(repo, branch, baseBranch, 0, 0)
+	}
+
+	// Standard worktree workflow
+	return runStandardCheckout(cfg, repo, branch, baseBranch)
+}
+
+// runStandardCheckout handles standard single-repo worktree creation
+func runStandardCheckout(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string) error {
 	// Check if worktree already exists
 	exists, path := internal.WorktreeExists(cfg, branch)
 	if exists {
@@ -72,6 +85,85 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBra
 	if postCmd := cfg.GetPostSetupCommand(worktreePath); postCmd != "" {
 		fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 	}
+
+	return nil
+}
+
+// runMattermostCheckout handles Mattermost dual-repo worktree creation
+func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch string, serverPort, metricsPort int) error {
+	// Create Mattermost config
+	mc, err := internal.NewMattermostConfig()
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	// Validate setup
+	if err := mc.ValidateMattermostSetup(); err != nil {
+		return err
+	}
+
+	// Check if worktree already exists
+	worktreePath := mc.GetMattermostWorktreePath(branch)
+	if _, err := os.Stat(worktreePath); err == nil {
+		// Worktree exists, just switch to it
+		fmt.Printf("Switching to existing Mattermost worktree for branch: %s\n", branch)
+		fmt.Printf("%s%s\n", internal.CDMarker, worktreePath)
+		return nil
+	}
+
+	// Determine ports if not specified
+	if serverPort == 0 || metricsPort == 0 {
+		// Get existing worktrees to auto-increment ports
+		config, _ := internal.NewConfig()
+		if config != nil {
+			worktrees, _ := internal.ListWorktrees(config)
+			if worktrees != nil {
+				autoServerPort, autoMetricsPort := internal.GetAvailablePorts(worktrees)
+				if serverPort == 0 {
+					serverPort = autoServerPort
+				}
+				if metricsPort == 0 {
+					metricsPort = autoMetricsPort
+				}
+			}
+		}
+		
+		// Fallback to defaults
+		if serverPort == 0 {
+			serverPort = 8065
+		}
+		if metricsPort == 0 {
+			metricsPort = 8067
+		}
+	}
+
+	mc.ServerPort = serverPort
+	mc.MetricsPort = metricsPort
+
+	// Create the dual-repo worktree
+	fmt.Printf("Creating Mattermost dual-repo worktree for branch: %s\n", branch)
+	fmt.Println("(Detected mattermost repository - creating unified worktree with enterprise)")
+	createdPath, err := internal.CreateMattermostDualWorktree(mc, branch, baseBranch)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("\nSuccessfully created Mattermost dual-repo worktree!\n")
+	fmt.Printf("\nDirectory structure:\n")
+	fmt.Printf("  %s/\n", createdPath)
+	fmt.Printf("  ├── server/      (mattermost worktree)\n")
+	fmt.Printf("  └── enterprise/  (enterprise worktree)\n")
+	fmt.Printf("\nServer configured on:\n")
+	fmt.Printf("  - Main server: http://localhost:%d\n", serverPort)
+	fmt.Printf("  - Metrics:     http://localhost:%d/metrics\n", metricsPort)
+	fmt.Printf("\n")
+
+	// Output CD marker for shell integration
+	fmt.Printf("%s%s\n", internal.CDMarker, createdPath)
+
+	// Run post-setup command
+	postCmd := fmt.Sprintf("cd %s/server && make setup-go-work", createdPath)
+	fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 
 	return nil
 }

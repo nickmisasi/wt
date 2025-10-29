@@ -12,12 +12,12 @@ import (
 
 // MattermostConfig holds configuration for Mattermost dual-repo worktrees
 type MattermostConfig struct {
-	WorkspaceRoot     string // e.g., ~/workspace
-	MattermostPath    string // e.g., ~/workspace/mattermost
-	EnterprisePath    string // e.g., ~/workspace/enterprise
-	WorktreeBasePath  string // e.g., ~/workspace/worktrees
-	ServerPort        int
-	MetricsPort       int
+	WorkspaceRoot    string // e.g., ~/workspace
+	MattermostPath   string // e.g., ~/workspace/mattermost
+	EnterprisePath   string // e.g., ~/workspace/enterprise
+	WorktreeBasePath string // e.g., ~/workspace/worktrees
+	ServerPort       int
+	MetricsPort      int
 }
 
 // FileCopyConfig defines files to copy with glob support
@@ -40,6 +40,26 @@ var enterpriseFiles = []FileCopyConfig{
 	{"go.work*", "enterprise/", false},
 }
 
+// IsMattermostRepo checks if the given repo is the mattermost repository
+func IsMattermostRepo(repo *GitRepo) bool {
+	// Check if repo name is "mattermost"
+	if repo.Name != "mattermost" {
+		return false
+	}
+	
+	// Additional validation: check if enterprise repo exists alongside it
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	
+	workspaceRoot := filepath.Join(homeDir, "workspace")
+	enterprisePath := filepath.Join(workspaceRoot, "enterprise")
+	
+	// If enterprise repo exists, this is definitely the mattermost setup
+	return isGitRepo(enterprisePath)
+}
+
 // NewMattermostConfig creates a new Mattermost configuration
 func NewMattermostConfig() (*MattermostConfig, error) {
 	homeDir, err := os.UserHomeDir()
@@ -48,7 +68,7 @@ func NewMattermostConfig() (*MattermostConfig, error) {
 	}
 
 	workspaceRoot := filepath.Join(homeDir, "workspace")
-	
+
 	return &MattermostConfig{
 		WorkspaceRoot:    workspaceRoot,
 		MattermostPath:   filepath.Join(workspaceRoot, "mattermost"),
@@ -106,7 +126,7 @@ func isGitWorktree(path string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Worktrees have a .git file (not directory) that points to the main repo
 	if info.Mode().IsRegular() {
 		data, err := os.ReadFile(gitFile)
@@ -114,7 +134,7 @@ func isGitWorktree(path string) bool {
 			return true
 		}
 	}
-	
+
 	// Could also be a directory for the main repo
 	return info.IsDir()
 }
@@ -130,7 +150,7 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 
 	// Track what we've created for cleanup
 	var serverWorktreeCreated, enterpriseWorktreeCreated bool
-	
+
 	cleanup := func() {
 		if serverWorktreeCreated {
 			removeWorktreeFromRepo(mc.MattermostPath, filepath.Join(targetDir, "server"), true)
@@ -213,7 +233,7 @@ func createWorktreeForRepo(repo *GitRepo, branch, baseBranch, worktreePath strin
 	}
 
 	var cmd *exec.Cmd
-	
+
 	if localExists {
 		// Branch exists locally
 		fmt.Printf("  → Branch exists locally in %s\n", repo.Name)
@@ -245,7 +265,7 @@ func copyFilesExcept(src, dst string, exclusions []string) error {
 
 	for _, entry := range entries {
 		name := entry.Name()
-		
+
 		// Skip exclusions
 		skip := false
 		for _, excl := range exclusions {

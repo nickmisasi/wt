@@ -20,38 +20,44 @@ COMMANDS:
     install                      Install shell integration and completions
     help                         Show this help message
 
-MATTERMOST DUAL-REPO COMMANDS:
-    co-mm, mm <branch> [opts]    Create Mattermost dual-repo worktree
-    rm-mm <branch> [opts]        Remove Mattermost dual-repo worktree
-    cursor-mm <branch> [opts]    Open Mattermost worktree in Cursor
-
 OPTIONS:
     -b, --base <branch>         Base branch for new branches (defaults to main/master)
-    -f, --force                 Force removal when using 'wt rm' or 'wt rm-mm'
-    --port <port>               Server port for Mattermost (auto-increments by default)
-    --metrics-port <port>       Metrics port for Mattermost (auto-increments by default)
-    --delete-branch             Delete branches from repos when using 'wt rm-mm'
+    -f, --force                 Force removal when using 'wt rm'
 
 WORKTREE STORAGE:
     Standard worktrees: ~/workspace/worktrees/<repo-name>-<branch-name>/
-    Mattermost dual-repo:
+
+MATTERMOST DUAL-REPOSITORY SUPPORT:
+    When working in the mattermost repository (~/workspace/mattermost), wt automatically
+    creates dual-repo worktrees that include both mattermost and enterprise repositories:
+
         ~/workspace/worktrees/mattermost-<branch-name>/
         ├── server/      (mattermost/mattermost worktree)
         └── enterprise/  (mattermost/enterprise worktree)
 
-EXAMPLES:
-    # Standard operations
-    wt co MM-12345                      # Create worktree for branch
-    wt co feature/new -b develop        # Create from base branch
-    wt rm MM-12345                      # Remove worktree
+    The tool automatically:
+    - Detects when you're in the mattermost repository
+    - Creates worktrees in both repositories for the same branch
+    - Copies base configuration files (CLAUDE.md, mise.toml, etc.)
+    - Updates config.json with auto-incremented ports (starting from 8065)
+    - Runs 'make setup-go-work' after creation
 
-    # Mattermost dual-repo operations
-    wt co-mm MM-12345                   # Create dual worktree (auto ports)
-    wt mm MM-12345 -b master            # Create from master branch
-    wt co-mm MM-12345 --port 8070       # Create with custom ports
-    wt rm-mm MM-12345                   # Remove dual worktree
-    wt rm-mm MM-12345 --delete-branch   # Remove and delete branches from both repos
-    wt cursor-mm MM-12345               # Open in Cursor
+    Requirements:
+    - ~/workspace/mattermost (mattermost/mattermost repo)
+    - ~/workspace/enterprise (mattermost/enterprise repo)
+
+EXAMPLES:
+    # Standard repository
+    cd ~/workspace/my-project
+    wt co feature-123            # Create worktree
+    wt rm feature-123            # Remove worktree
+
+    # Mattermost repository (automatic dual-repo)
+    cd ~/workspace/mattermost
+    wt co MM-12345               # Creates dual worktree with auto ports
+    wt co MM-12345 -b master     # Create from master branch
+    wt rm MM-12345               # Removes both worktrees
+    wt cursor MM-12345           # Open in Cursor
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.
