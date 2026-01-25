@@ -376,28 +376,18 @@ func TestGetAvailablePortsWithRand(t *testing.T) {
 
 		var worktrees []WorktreeInfo
 		for i, port := range reservedServerPorts {
-			worktreePath := filepath.Join(tmpDir, "mattermost-branch"+string(rune('0'+i)))
-			mmDir := filepath.Join(worktreePath, "mattermost-branch"+string(rune('0'+i)))
+			worktreePath := filepath.Join(tmpDir, fmt.Sprintf("mattermost-branch%d", i))
+			mmDir := filepath.Join(worktreePath, fmt.Sprintf("mattermost-branch%d", i))
 			configDir := filepath.Join(mmDir, "server", "config")
 			os.MkdirAll(configDir, 0755)
 
 			os.WriteFile(filepath.Join(mmDir, ".git"), []byte("gitdir: /path/to/git"), 0644)
 
-			entDir := filepath.Join(worktreePath, "enterprise-branch"+string(rune('0'+i)))
+			entDir := filepath.Join(worktreePath, fmt.Sprintf("enterprise-branch%d", i))
 			os.MkdirAll(entDir, 0755)
 			os.WriteFile(filepath.Join(entDir, ".git"), []byte("gitdir: /path/to/git"), 0644)
 
 			config := map[string]interface{}{
-				"ServiceSettings": map[string]interface{}{
-					"ListenAddress": ":" + string(rune('0'+port/1000)) + string(rune('0'+(port%1000)/100)) + string(rune('0'+(port%100)/10)) + string(rune('0'+port%10)),
-				},
-				"MetricsSettings": map[string]interface{}{
-					"ListenAddress": ":" + string(rune('0'+(port+1)/1000)) + string(rune('0'+((port+1)%1000)/100)) + string(rune('0'+((port+1)%100)/10)) + string(rune('0'+(port+1)%10)),
-				},
-			}
-
-			// Use fmt.Sprintf for proper port formatting
-			config = map[string]interface{}{
 				"ServiceSettings": map[string]interface{}{
 					"ListenAddress": fmt.Sprintf(":%d", port),
 				},
@@ -411,7 +401,7 @@ func TestGetAvailablePortsWithRand(t *testing.T) {
 
 			worktrees = append(worktrees, WorktreeInfo{
 				Path:   worktreePath,
-				Branch: "branch" + string(rune('0'+i)),
+				Branch: fmt.Sprintf("branch%d", i),
 			})
 		}
 
