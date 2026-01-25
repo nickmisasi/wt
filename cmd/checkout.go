@@ -2,13 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/nickmisasi/wt/internal"
 )
 
+const enableClaudeDocsScript = "enable-claude-docs.sh"
+
 // RunCheckout checks out or creates a worktree for the given branch
-func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBranch string) error {
+func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBranch string, noClaudeDocs bool) error {
 	cfg, ok := config.(*internal.Config)
 	if !ok {
 		return fmt.Errorf("invalid config type")
@@ -22,15 +25,15 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBra
 	// Check if this is the mattermost repository
 	if internal.IsMattermostRepo(repo) {
 		// Use Mattermost dual-repo workflow
-		return runMattermostCheckout(repo, branch, baseBranch, 0, 0)
+		return runMattermostCheckout(repo, branch, baseBranch, 0, 0, noClaudeDocs)
 	}
 
 	// Standard worktree workflow
-	return runStandardCheckout(cfg, repo, branch, baseBranch)
+	return runStandardCheckout(cfg, repo, branch, baseBranch, noClaudeDocs)
 }
 
 // runStandardCheckout handles standard single-repo worktree creation
-func runStandardCheckout(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string) error {
+func runStandardCheckout(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string, noClaudeDocs bool) error {
 	// Check if worktree already exists
 	exists, path := internal.WorktreeExists(cfg, branch)
 	if exists {
@@ -86,11 +89,26 @@ func runStandardCheckout(cfg *internal.Config, repo *internal.GitRepo, branch st
 		fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
 	}
 
+	// Run enable-claude-docs.sh if it exists and not disabled
+	if !noClaudeDocs {
+		emitEnableClaudeDocsCommand(worktreePath)
+	}
+
 	return nil
 }
 
+// emitEnableClaudeDocsCommand checks if enable-claude-docs.sh exists in the worktree root and emits a command marker
+func emitEnableClaudeDocsCommand(worktreePath string) {
+	scriptPath := filepath.Join(worktreePath, enableClaudeDocsScript)
+	if _, err := os.Stat(scriptPath); err == nil {
+		// Script exists, emit command to run it from the worktree directory
+		cmd := fmt.Sprintf("cd %s && ./%s", worktreePath, enableClaudeDocsScript)
+		fmt.Printf("%s%s\n", internal.CMDMarker, cmd)
+	}
+}
+
 // runMattermostCheckout handles Mattermost dual-repo worktree creation
-func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch string, serverPort, metricsPort int) error {
+func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch string, serverPort, metricsPort int, noClaudeDocs bool) error {
 	// Create Mattermost config
 	mc, err := internal.NewMattermostConfig()
 	if err != nil {
@@ -176,6 +194,13 @@ func runMattermostCheckout(repo *internal.GitRepo, branch string, baseBranch str
 	// Run post-setup command (use symlink path for compatibility)
 	postCmd := fmt.Sprintf("cd %s/mattermost/server && make setup-go-work", createdPath)
 	fmt.Printf("%s%s\n", internal.CMDMarker, postCmd)
+
+	// Run enable-claude-docs.sh if it exists and not disabled
+	// Check in the mattermost subdirectory for Mattermost repos
+	if !noClaudeDocs {
+		mattermostSubdir := filepath.Join(createdPath, "mattermost-"+sanitizedBranch)
+		emitEnableClaudeDocsCommand(mattermostSubdir)
+	}
 
 	return nil
 }

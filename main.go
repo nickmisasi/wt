@@ -51,10 +51,10 @@ func run() error {
 
 	case "co", "checkout":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: wt co <branch> [-b|--base <base-branch>]")
+			return fmt.Errorf("usage: wt co <branch> [-b|--base <base-branch>] [-n|--no-claude-docs]")
 		}
-		branch, baseBranch := parseCheckoutArgs(args[1:])
-		return cmd.RunCheckout(config, gitRepo, branch, baseBranch)
+		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
+		return cmd.RunCheckout(config, gitRepo, branch, baseBranch, noClaudeDocs)
 
 	case "rm", "remove":
 		if len(args) < 2 {
@@ -68,10 +68,10 @@ func run() error {
 
 	case "cursor":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: wt cursor <branch> [-b|--base <base-branch>]")
+			return fmt.Errorf("usage: wt cursor <branch> [-b|--base <base-branch>] [-n|--no-claude-docs]")
 		}
-		branch, baseBranch := parseCheckoutArgs(args[1:])
-		return cmd.RunCursor(config, gitRepo, branch, baseBranch)
+		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
+		return cmd.RunCursor(config, gitRepo, branch, baseBranch, noClaudeDocs)
 
 	case "t", "toggle":
 		return cmd.RunToggle()
@@ -81,24 +81,27 @@ func run() error {
 	}
 }
 
-// parseCheckoutArgs parses branch and optional base branch from command arguments
-func parseCheckoutArgs(args []string) (branch string, baseBranch string) {
+// parseCheckoutArgs parses branch, optional base branch, and noClaudeDocs flag from command arguments
+func parseCheckoutArgs(args []string) (branch string, baseBranch string, noClaudeDocs bool) {
 	if len(args) == 0 {
-		return "", ""
+		return "", "", false
 	}
 
 	branch = args[0]
 	baseBranch = ""
+	noClaudeDocs = false
 
-	// Look for -b or --base flag
+	// Look for flags
 	for i := 1; i < len(args); i++ {
 		if (args[i] == "-b" || args[i] == "--base") && i+1 < len(args) {
 			baseBranch = args[i+1]
-			break
+			i++ // Skip the next arg since it's the base branch value
+		} else if args[i] == "-n" || args[i] == "--no-claude-docs" {
+			noClaudeDocs = true
 		}
 	}
 
-	return branch, baseBranch
+	return branch, baseBranch, noClaudeDocs
 }
 
 // parseRemoveArgs parses branch and optional --force flag

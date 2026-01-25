@@ -4,11 +4,38 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// Port selection constants for Mattermost worktrees
+const (
+	// PortRangeStart is the beginning of the port range for worktree allocation
+	PortRangeStart = 8100
+
+	// PortRangeEnd is the end of the port range for worktree allocation (inclusive)
+	PortRangeEnd = 8999
+
+	// MainRepoPort is the port used by the main mattermost repository (excluded from allocation)
+	MainRepoPort = 8065
+
+	// MetricsPortOffset is added to the server port to get the metrics port
+	// This is 2 to match the main Mattermost repo convention (8065 server → 8067 metrics)
+	MetricsPortOffset = 2
+
+	// PortRandomRetries is the number of random attempts before falling back to sequential scan
+	PortRandomRetries = 50
+)
+
+// ExcludedPorts contains ports that should never be allocated to worktrees
+var ExcludedPorts = map[int]bool{
+	MainRepoPort:     true, // Main repo server port
+	MainRepoPort + 2: true, // Main repo metrics port (8067)
+}
 
 // MattermostConfig holds configuration for Mattermost dual-repo worktrees
 type MattermostConfig struct {
@@ -535,16 +562,24 @@ func updateConfigPorts(configPath string, serverPort, metricsPort int) error {
 		return err
 	}
 
-	// Update ServiceSettings
-	if serviceSettings, ok := config["ServiceSettings"].(map[string]interface{}); ok {
-		serviceSettings["ListenAddress"] = fmt.Sprintf(":%d", serverPort)
-		serviceSettings["SiteURL"] = fmt.Sprintf("http://localhost:%d", serverPort)
+	// Get or create ServiceSettings
+	serviceSettings, ok := config["ServiceSettings"].(map[string]interface{})
+	if !ok {
+		// ServiceSettings doesn't exist or is not a map - create it
+		serviceSettings = make(map[string]interface{})
+		config["ServiceSettings"] = serviceSettings
 	}
+	serviceSettings["ListenAddress"] = fmt.Sprintf(":%d", serverPort)
+	serviceSettings["SiteURL"] = fmt.Sprintf("http://localhost:%d", serverPort)
 
-	// Update MetricsSettings
-	if metricsSettings, ok := config["MetricsSettings"].(map[string]interface{}); ok {
-		metricsSettings["ListenAddress"] = fmt.Sprintf(":%d", metricsPort)
+	// Get or create MetricsSettings
+	metricsSettings, ok := config["MetricsSettings"].(map[string]interface{})
+	if !ok {
+		// MetricsSettings doesn't exist or is not a map - create it
+		metricsSettings = make(map[string]interface{})
+		config["MetricsSettings"] = metricsSettings
 	}
+	metricsSettings["ListenAddress"] = fmt.Sprintf(":%d", metricsPort)
 
 	// Write back with indentation
 	updatedData, err := json.MarshalIndent(config, "", "    ")
@@ -652,61 +687,160 @@ func DeleteBranchFromRepos(mc *MattermostConfig, branch string) error {
 	return nil
 }
 
-// GetAvailablePorts returns available ports based on existing worktrees
-func GetAvailablePorts(existingWorktrees []WorktreeInfo) (serverPort, metricsPort int) {
-	baseServerPort := 8066 // Start at 8066, leaving 8065 for main repo
-	maxServerPort := baseServerPort
+// IsPortAvailable checks if a port is available for use on localhost.
+// It attempts to listen on the port and returns true if successful (port is free),
+// or false if the port is already in use.
+func IsPortAvailable(port int) bool {
+	addr := fmt.Sprintf(":%d", port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false
+	}
+	listener.Close()
+	return true
+}
 
-	// Find highest used port from existing worktrees
+// PortPair represents a server port and its associated metrics port
+type PortPair struct {
+	ServerPort  int
+	MetricsPort int
+}
+
+// GetReservedPorts extracts all ports currently used by existing Mattermost worktrees.
+// It returns a map of port numbers that are reserved (both server and metrics ports).
+// Missing or invalid config files are tolerated (logged but don't cause errors).
+func GetReservedPorts(existingWorktrees []WorktreeInfo) map[int]bool {
+	reserved := make(map[int]bool)
+
+	// Copy excluded ports into the reserved set
+	for port := range ExcludedPorts {
+		reserved[port] = true
+	}
+
 	for _, wt := range existingWorktrees {
-		if IsMattermostDualWorktree(wt.Path) {
-			// Find the mattermost-* directory
-			entries, err := os.ReadDir(wt.Path)
-			if err != nil {
-				continue
-			}
+		if !IsMattermostDualWorktree(wt.Path) {
+			continue
+		}
 
-			for _, entry := range entries {
-				if entry.IsDir() && strings.HasPrefix(entry.Name(), "mattermost-") {
-					configPath := filepath.Join(wt.Path, entry.Name(), "server", "config", "config.json")
-					if port := extractPortFromConfig(configPath); port > maxServerPort {
-						maxServerPort = port
-					}
-					break
+		// Find the mattermost-* directory
+		entries, err := os.ReadDir(wt.Path)
+		if err != nil {
+			// Tolerate missing directories
+			continue
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), "mattermost-") {
+				configPath := filepath.Join(wt.Path, entry.Name(), "server", "config", "config.json")
+				portPair := extractPortPairFromConfig(configPath)
+				if portPair.ServerPort > 0 {
+					reserved[portPair.ServerPort] = true
 				}
+				if portPair.MetricsPort > 0 {
+					reserved[portPair.MetricsPort] = true
+				}
+				break
 			}
 		}
 	}
 
-	// If we found worktrees, increment from highest; otherwise use base
-	if maxServerPort > baseServerPort {
-		serverPort = maxServerPort + 1
-	} else {
-		serverPort = baseServerPort
-	}
-	metricsPort = serverPort + 2 // Keep 2-port offset
-
-	return serverPort, metricsPort
+	return reserved
 }
 
-// extractPortFromConfig reads the server port from config.json
-func extractPortFromConfig(configPath string) int {
+// extractPortPairFromConfig reads both server and metrics ports from config.json
+func extractPortPairFromConfig(configPath string) PortPair {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return 0
+		return PortPair{}
 	}
 
 	var config MattermostServerConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		return 0
+		return PortPair{}
 	}
 
+	var pair PortPair
+
+	// Extract server port from ServiceSettings.ListenAddress
 	if listenAddr, ok := config.ServiceSettings["ListenAddress"].(string); ok {
-		var port int
-		if _, err := fmt.Sscanf(listenAddr, ":%d", &port); err == nil {
-			return port
+		fmt.Sscanf(listenAddr, ":%d", &pair.ServerPort)
+	}
+
+	// Extract metrics port from MetricsSettings.ListenAddress
+	if config.MetricsSettings != nil {
+		if listenAddr, ok := config.MetricsSettings["ListenAddress"].(string); ok {
+			fmt.Sscanf(listenAddr, ":%d", &pair.MetricsPort)
 		}
 	}
 
-	return 0
+	return pair
 }
+
+// isPortPairAvailable checks if both the server port and metrics port are available.
+// A port pair is available if:
+// 1. Neither port is in the reserved set
+// 2. Neither port is currently in use on localhost
+func isPortPairAvailable(serverPort int, reserved map[int]bool) bool {
+	metricsPort := serverPort + MetricsPortOffset
+
+	// Check if ports are reserved by existing worktrees
+	if reserved[serverPort] || reserved[metricsPort] {
+		return false
+	}
+
+	// Check if ports are currently in use on localhost
+	if !IsPortAvailable(serverPort) || !IsPortAvailable(metricsPort) {
+		return false
+	}
+
+	return true
+}
+
+// GetAvailablePorts returns available ports for a new Mattermost worktree.
+// It uses a randomized search within the port range, validating that both
+// server and metrics ports are free. Falls back to sequential scan if
+// random attempts are exhausted.
+func GetAvailablePorts(existingWorktrees []WorktreeInfo) (serverPort, metricsPort int) {
+	return GetAvailablePortsWithRand(existingWorktrees, nil)
+}
+
+// GetAvailablePortsWithRand is like GetAvailablePorts but accepts a custom random
+// source for deterministic testing. If rng is nil, a new random source is used.
+func GetAvailablePortsWithRand(existingWorktrees []WorktreeInfo, rng *rand.Rand) (serverPort, metricsPort int) {
+	reserved := GetReservedPorts(existingWorktrees)
+
+	// Use provided RNG or create a new one
+	if rng == nil {
+		rng = rand.New(rand.NewSource(rand.Int63()))
+	}
+
+	// Calculate the valid port range (accounting for metrics port offset)
+	// Server port can be from PortRangeStart to (PortRangeEnd - MetricsPortOffset)
+	// so that metrics port doesn't exceed PortRangeEnd
+	maxServerPort := PortRangeEnd - MetricsPortOffset
+	portRangeSize := maxServerPort - PortRangeStart + 1
+
+	// Phase 1: Random selection attempts
+	for attempt := 0; attempt < PortRandomRetries; attempt++ {
+		candidatePort := PortRangeStart + rng.Intn(portRangeSize)
+		if isPortPairAvailable(candidatePort, reserved) {
+			return candidatePort, candidatePort + MetricsPortOffset
+		}
+	}
+
+	// Phase 2: Sequential fallback scan
+	// Start from a random position to avoid always returning the same port
+	// when random attempts fail due to many reserved ports
+	startOffset := rng.Intn(portRangeSize)
+	for i := 0; i < portRangeSize; i++ {
+		candidatePort := PortRangeStart + ((startOffset + i) % portRangeSize)
+		if isPortPairAvailable(candidatePort, reserved) {
+			return candidatePort, candidatePort + MetricsPortOffset
+		}
+	}
+
+	// If all ports are exhausted, return a fallback (this should be rare)
+	// Return 0, 0 to indicate no ports available
+	return 0, 0
+}
+
