@@ -76,8 +76,19 @@ _wt() {
             ;;
         args)
             case $line[1] in
-                co|cursor|rm)
-                    _wt_complete_branches
+                co|cursor)
+                    _arguments \
+                        '1:branch:_wt_complete_branches' \
+                        '-b[Base branch]:base branch:_wt_complete_branches' \
+                        '--base[Base branch]:base branch:_wt_complete_branches' \
+                        '-n[Skip running enable-claude-docs.sh]' \
+                        '--no-claude-docs[Skip running enable-claude-docs.sh]'
+                    ;;
+                rm)
+                    _arguments \
+                        '1:branch:_wt_complete_branches' \
+                        '-f[Force removal]' \
+                        '--force[Force removal]'
                     ;;
             esac
             ;;
