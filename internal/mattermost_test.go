@@ -66,7 +66,7 @@ func TestExtractPortPairFromConfig(t *testing.T) {
 			t.Fatalf("failed to write test config: %v", err)
 		}
 
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 
 		if pair.ServerPort != 8100 {
 			t.Errorf("expected server port 8100, got %d", pair.ServerPort)
@@ -89,7 +89,7 @@ func TestExtractPortPairFromConfig(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configPath, data, 0644)
 
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 
 		if pair.ServerPort != 8200 {
 			t.Errorf("expected server port 8200, got %d", pair.ServerPort)
@@ -100,7 +100,7 @@ func TestExtractPortPairFromConfig(t *testing.T) {
 	})
 
 	t.Run("missing config file returns zero ports", func(t *testing.T) {
-		pair := extractPortPairFromConfig("/nonexistent/config.json")
+		pair := ExtractPortPairFromConfig("/nonexistent/config.json")
 
 		if pair.ServerPort != 0 || pair.MetricsPort != 0 {
 			t.Errorf("expected zero ports for missing file, got server=%d, metrics=%d",
@@ -114,7 +114,7 @@ func TestExtractPortPairFromConfig(t *testing.T) {
 
 		os.WriteFile(configPath, []byte("not valid json"), 0644)
 
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 
 		if pair.ServerPort != 0 || pair.MetricsPort != 0 {
 			t.Errorf("expected zero ports for invalid JSON, got server=%d, metrics=%d",
@@ -155,7 +155,7 @@ func TestUpdateConfigPorts(t *testing.T) {
 		}
 
 		// Read back and verify
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 		if pair.ServerPort != 8891 {
 			t.Errorf("expected server port 8891, got %d", pair.ServerPort)
 		}
@@ -198,7 +198,7 @@ func TestUpdateConfigPorts(t *testing.T) {
 		}
 
 		// Read back and verify ports were set
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 		if pair.ServerPort != 8891 {
 			t.Errorf("expected server port 8891 after creating ServiceSettings, got %d", pair.ServerPort)
 		}
@@ -226,7 +226,7 @@ func TestUpdateConfigPorts(t *testing.T) {
 			t.Fatalf("updateConfigPorts failed: %v", err)
 		}
 
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 		if pair.MetricsPort != 8893 {
 			t.Errorf("expected metrics port 8893 after creating MetricsSettings, got %d", pair.MetricsPort)
 		}
@@ -244,7 +244,7 @@ func TestUpdateConfigPorts(t *testing.T) {
 			t.Fatalf("updateConfigPorts failed on empty config: %v", err)
 		}
 
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 		if pair.ServerPort != 8891 {
 			t.Errorf("expected server port 8891 on empty config, got %d", pair.ServerPort)
 		}
@@ -265,7 +265,7 @@ func TestUpdateConfigPorts(t *testing.T) {
 			t.Fatalf("updateConfigPorts failed on null settings: %v", err)
 		}
 
-		pair := extractPortPairFromConfig(configPath)
+		pair := ExtractPortPairFromConfig(configPath)
 		if pair.ServerPort != 8891 {
 			t.Errorf("expected server port 8891 when ServiceSettings was null, got %d", pair.ServerPort)
 		}

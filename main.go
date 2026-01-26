@@ -76,6 +76,9 @@ func run() error {
 	case "t", "toggle":
 		return cmd.RunToggle()
 
+	case "port":
+		return cmd.RunPort(config, gitRepo)
+
 	default:
 		return fmt.Errorf("unknown command: %s\nRun 'wt help' for usage information", args[0])
 	}

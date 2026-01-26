@@ -732,7 +732,7 @@ func GetReservedPorts(existingWorktrees []WorktreeInfo) map[int]bool {
 		for _, entry := range entries {
 			if entry.IsDir() && strings.HasPrefix(entry.Name(), "mattermost-") {
 				configPath := filepath.Join(wt.Path, entry.Name(), "server", "config", "config.json")
-				portPair := extractPortPairFromConfig(configPath)
+				portPair := ExtractPortPairFromConfig(configPath)
 				if portPair.ServerPort > 0 {
 					reserved[portPair.ServerPort] = true
 				}
@@ -747,8 +747,43 @@ func GetReservedPorts(existingWorktrees []WorktreeInfo) map[int]bool {
 	return reserved
 }
 
-// extractPortPairFromConfig reads both server and metrics ports from config.json
-func extractPortPairFromConfig(configPath string) PortPair {
+// FindMattermostConfig finds the path to config.json in a worktree or repo
+func FindMattermostConfig(root string) (string, string, error) {
+	// 1. Check if we are in a Mattermost dual worktree
+	isDual := IsMattermostDualWorktree(root)
+
+	if isDual {
+		// Find the mattermost-* directory
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to read worktree directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), "mattermost-") {
+				serverDir := filepath.Join(root, entry.Name(), "server")
+				configPath := filepath.Join(serverDir, "config", "config.json")
+				return serverDir, configPath, nil
+			}
+		}
+
+		return "", "", fmt.Errorf("could not find mattermost server directory in dual worktree")
+	}
+
+	// 2. Check if we are in a standard Mattermost repo or a single worktree
+	// We expect a server/config/config.json relative to root
+	candidateServerDir := filepath.Join(root, "server")
+	candidateConfig := filepath.Join(candidateServerDir, "config", "config.json")
+
+	if _, err := os.Stat(candidateConfig); err == nil {
+		return candidateServerDir, candidateConfig, nil
+	}
+
+	return "", "", fmt.Errorf("not a recognized Mattermost worktree (config.json not found)")
+}
+
+// ExtractPortPairFromConfig reads both server and metrics ports from config.json
+func ExtractPortPairFromConfig(configPath string) PortPair {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return PortPair{}

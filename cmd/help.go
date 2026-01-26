@@ -17,6 +17,7 @@ COMMANDS:
     rm <branch> [-f]             Remove a worktree for branch (use -f to force)
     clean                        Remove stale worktrees (clean, >30 days old)
     cursor <branch> [-b <base>] [-n]  Open Cursor editor for branch's worktree
+    port                         Show current worktree's mapped ports
     t, toggle                    Return to parent repository from worktree
     install                      Install shell integration and completions
     help                         Show this help message
@@ -62,6 +63,7 @@ EXAMPLES:
     wt co MM-12345 -b master     # Create from master branch
     wt rm MM-12345               # Removes both worktrees
     wt cursor MM-12345           # Open in Cursor
+    wt port                      # Show server ports
 
     # Navigation
     cd ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345
