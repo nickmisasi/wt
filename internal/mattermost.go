@@ -260,12 +260,25 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 	// Create enterprise worktree at enterprise-<branch>/
 	fmt.Printf("Creating enterprise worktree for branch: %s\n", branch)
 	if err := createWorktreeForRepo(enterpriseRepo, branch, baseBranch, enterpriseWorktreePath); err != nil {
-		cleanup()
-		// Check if this is an "already used by worktree" error
-		if strings.Contains(err.Error(), "already used by worktree") {
-			return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd ~/workspace/enterprise\n  git worktree prune\n\nThen try again", err)
+		// If base branch not found in enterprise, fall back to default branch
+		if strings.Contains(err.Error(), "not found in") {
+			defaultBranch := enterpriseRepo.GetDefaultBranch()
+			fmt.Printf("  ⚠ Warning: %v\n", err)
+			fmt.Printf("  → Falling back to default branch '%s' in enterprise\n", defaultBranch)
+			if err := createWorktreeForRepo(enterpriseRepo, branch, defaultBranch, enterpriseWorktreePath); err != nil {
+				cleanup()
+				if strings.Contains(err.Error(), "already used by worktree") {
+					return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd ~/workspace/enterprise\n  git worktree prune\n\nThen try again", err)
+				}
+				return "", fmt.Errorf("failed to create enterprise worktree: %w", err)
+			}
+		} else {
+			cleanup()
+			if strings.Contains(err.Error(), "already used by worktree") {
+				return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd ~/workspace/enterprise\n  git worktree prune\n\nThen try again", err)
+			}
+			return "", fmt.Errorf("failed to create enterprise worktree: %w", err)
 		}
-		return "", fmt.Errorf("failed to create enterprise worktree: %w", err)
 	}
 	enterpriseWorktreeCreated = true
 
