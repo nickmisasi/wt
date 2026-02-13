@@ -547,7 +547,9 @@ func TestSequentialFallback(t *testing.T) {
 // and optionally creates additional branches.
 func setupTestGitRepo(t *testing.T, path string, extraBranches ...string) {
 	t.Helper()
-	os.MkdirAll(path, 0755)
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatalf("failed to create repo directory %s: %v", path, err)
+	}
 
 	run := func(args ...string) {
 		cmd := exec.Command("git", append([]string{"-C", path}, args...)...)
@@ -560,7 +562,9 @@ func setupTestGitRepo(t *testing.T, path string, extraBranches ...string) {
 	run("config", "user.email", "test@test.com")
 	run("config", "user.name", "Test")
 
-	os.WriteFile(filepath.Join(path, "README.md"), []byte("test"), 0644)
+	if err := os.WriteFile(filepath.Join(path, "README.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to write README.md: %v", err)
+	}
 	run("add", ".")
 	run("commit", "-m", "initial commit")
 
