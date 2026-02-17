@@ -10,6 +10,12 @@ import (
 	"github.com/nickmisasi/wt/internal"
 )
 
+// parseEditor splits an editor config string into the program name and any extra arguments.
+func parseEditor(editor string) (program string, args []string) {
+	parts := strings.Fields(editor)
+	return parts[0], parts[1:]
+}
+
 // RunEditHere opens the configured editor on the current worktree (no branch argument needed)
 func RunEditHere() error {
 	// Load user config to get editor
@@ -18,13 +24,15 @@ func RunEditHere() error {
 		return fmt.Errorf("failed to load user config: %w", err)
 	}
 
-	editor := userCfg.Editor
+	editor := userCfg.Editor.Command
 	if editor == "" {
-		return fmt.Errorf("no editor configured. Set one with: wt config set editor <editor>")
+		return fmt.Errorf("no editor configured. Set one with: wt config set editor.command <editor>")
 	}
 
-	if _, err := exec.LookPath(editor); err != nil {
-		return fmt.Errorf("editor %q not found in PATH", editor)
+	editorProgram, editorArgs := parseEditor(editor)
+
+	if _, err := exec.LookPath(editorProgram); err != nil {
+		return fmt.Errorf("editor %q not found in PATH", editorProgram)
 	}
 
 	cwd, err := os.Getwd()
@@ -32,19 +40,17 @@ func RunEditHere() error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	homeDir, err := os.UserHomeDir()
+	cfg, err := internal.NewConfig()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to create config: %w", err)
 	}
 
-	worktreesDir := filepath.Join(homeDir, "workspace", "worktrees")
-
-	if !strings.HasPrefix(cwd, worktreesDir) {
+	if !strings.HasPrefix(cwd, cfg.WorktreeBasePath) {
 		return fmt.Errorf("not in a worktree directory. Usage: wt edit <branch>")
 	}
 
-	// Extract worktree root (first path component under worktreesDir)
-	relPath, err := filepath.Rel(worktreesDir, cwd)
+	// Extract worktree root (first path component under WorktreeBasePath)
+	relPath, err := filepath.Rel(cfg.WorktreeBasePath, cwd)
 	if err != nil {
 		return fmt.Errorf("failed to determine relative path: %w", err)
 	}
@@ -54,39 +60,30 @@ func RunEditHere() error {
 		return fmt.Errorf("not in a worktree directory. Usage: wt edit <branch>")
 	}
 
-	worktreeRoot := filepath.Join(worktreesDir, parts[0])
+	worktreeRoot := filepath.Join(cfg.WorktreeBasePath, parts[0])
 
-	fmt.Printf("Opening %s in %s\n", editor, worktreeRoot)
-	cmd := exec.Command(editor, worktreeRoot)
+	fmt.Printf("Opening %s in %s\n", editorProgram, worktreeRoot)
+	cmd := exec.Command(editorProgram, append(editorArgs, worktreeRoot)...)
 	return cmd.Start()
 }
 
 // RunEdit opens the user-configured editor for the given branch's worktree
-func RunEdit(config interface{}, gitRepo interface{}, branch string, baseBranch string, noClaudeDocs bool) error {
-	cfg, ok := config.(*internal.Config)
-	if !ok {
-		return fmt.Errorf("invalid config type")
-	}
-
-	repo, ok := gitRepo.(*internal.GitRepo)
-	if !ok {
-		return fmt.Errorf("invalid git repo type")
-	}
-
+func RunEdit(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string, noClaudeDocs bool) error {
 	// Load user config to get editor
 	userCfg, err := internal.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load user config: %w", err)
 	}
 
-	editor := userCfg.Editor
+	editor := userCfg.Editor.Command
 	if editor == "" {
-		return fmt.Errorf("no editor configured. Set one with: wt config set editor <editor>")
+		return fmt.Errorf("no editor configured. Set one with: wt config set editor.command <editor>")
 	}
 
-	// Check if editor is available
-	if _, err := exec.LookPath(editor); err != nil {
-		return fmt.Errorf("editor %q not found in PATH", editor)
+	// Check if editor program is available
+	editorProgram, _ := parseEditor(editor)
+	if _, err := exec.LookPath(editorProgram); err != nil {
+		return fmt.Errorf("editor %q not found in PATH", editorProgram)
 	}
 
 	// Check if this is the mattermost repository
@@ -105,53 +102,24 @@ func runStandardEdit(cfg *internal.Config, repo *internal.GitRepo, branch string
 	worktreeCreated := false
 
 	if !exists {
-		// Create the worktree first
 		fmt.Printf("Worktree doesn't exist for branch '%s'. Creating it...\n", branch)
 
-		// Check if branch exists, create tracking branch if needed
-		branchExists, err := repo.BranchExists(branch)
+		var err error
+		path, err = ensureBranchAndCreateWorktree(cfg, repo, branch, baseBranch)
 		if err != nil {
-			return fmt.Errorf("failed to check if branch exists: %w", err)
-		}
-
-		createNewBranch := false
-		if !branchExists {
-			remoteBranchExists, err := repo.RemoteBranchExists(branch)
-			if err != nil {
-				return fmt.Errorf("failed to check remote branches: %w", err)
-			}
-
-			if remoteBranchExists {
-				fmt.Printf("Creating local branch '%s' tracking 'origin/%s'...\n", branch, branch)
-				err = repo.CreateTrackingBranch(branch)
-				if err != nil {
-					return fmt.Errorf("failed to create tracking branch: %w", err)
-				}
-			} else {
-				// If no base branch specified, use the default branch
-				if baseBranch == "" {
-					baseBranch = repo.GetDefaultBranch()
-				}
-				fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
-				createNewBranch = true
-			}
-		}
-
-		// Create the worktree
-		path, err = internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch)
-		if err != nil {
-			return fmt.Errorf("failed to create worktree: %w", err)
+			return err
 		}
 		fmt.Printf("Worktree created at: %s\n", path)
 		worktreeCreated = true
 	}
 
 	// Open editor
-	fmt.Printf("Opening %s for branch: %s\n", editor, branch)
-	cmd := exec.Command(editor, path)
+	editorProgram, editorArgs := parseEditor(editor)
+	fmt.Printf("Opening %s for branch: %s\n", editorProgram, branch)
+	cmd := exec.Command(editorProgram, append(editorArgs, path)...)
 	err := cmd.Start()
 	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", editor, err)
+		return fmt.Errorf("failed to open %s: %w", editorProgram, err)
 	}
 
 	// Optionally also switch directory
@@ -198,12 +166,13 @@ func runMattermostEdit(repo *internal.GitRepo, branch string, baseBranch string,
 	}
 
 	// Open in editor
-	fmt.Printf("Opening %s for branch: %s\n", editor, branch)
+	editorProgram, editorArgs := parseEditor(editor)
+	fmt.Printf("Opening %s for branch: %s\n", editorProgram, branch)
 
-	cmd := exec.Command(editor, worktreePath)
+	cmd := exec.Command(editorProgram, append(editorArgs, worktreePath)...)
 	err = cmd.Start()
 	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", editor, err)
+		return fmt.Errorf("failed to open %s: %w", editorProgram, err)
 	}
 
 	// Switch directory

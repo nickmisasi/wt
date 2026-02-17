@@ -16,7 +16,7 @@ Subcommands:
     set <key> <value> Set a configuration value
 
 Available keys:
-    editor            Editor command to use (default: cursor)
+    editor.command    Editor command to use (default: cursor)
 `
 
 // RunConfig routes config subcommands.

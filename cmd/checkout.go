@@ -11,17 +11,7 @@ import (
 const enableClaudeDocsScript = "enable-claude-docs.sh"
 
 // RunCheckout checks out or creates a worktree for the given branch
-func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBranch string, noClaudeDocs bool) error {
-	cfg, ok := config.(*internal.Config)
-	if !ok {
-		return fmt.Errorf("invalid config type")
-	}
-
-	repo, ok := gitRepo.(*internal.GitRepo)
-	if !ok {
-		return fmt.Errorf("invalid git repo type")
-	}
-
+func RunCheckout(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string, noClaudeDocs bool) error {
 	// Check if this is the mattermost repository
 	if internal.IsMattermostRepo(repo) {
 		// Use Mattermost dual-repo workflow
@@ -30,6 +20,43 @@ func RunCheckout(config interface{}, gitRepo interface{}, branch string, baseBra
 
 	// Standard worktree workflow
 	return runStandardCheckout(cfg, repo, branch, baseBranch, noClaudeDocs)
+}
+
+// ensureBranchAndCreateWorktree checks if a branch exists (locally or remotely),
+// creates a tracking branch if needed, and creates a worktree for it.
+func ensureBranchAndCreateWorktree(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string) (string, error) {
+	branchExists, err := repo.BranchExists(branch)
+	if err != nil {
+		return "", fmt.Errorf("failed to check if branch exists: %w", err)
+	}
+
+	createNewBranch := false
+	if !branchExists {
+		remoteBranchExists, err := repo.RemoteBranchExists(branch)
+		if err != nil {
+			return "", fmt.Errorf("failed to check remote branches: %w", err)
+		}
+
+		if remoteBranchExists {
+			fmt.Printf("Creating local branch '%s' tracking 'origin/%s'...\n", branch, branch)
+			if err := repo.CreateTrackingBranch(branch); err != nil {
+				return "", fmt.Errorf("failed to create tracking branch: %w", err)
+			}
+		} else {
+			if baseBranch == "" {
+				baseBranch = repo.GetDefaultBranch()
+			}
+			fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
+			createNewBranch = true
+		}
+	}
+
+	path, err := internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch)
+	if err != nil {
+		return "", fmt.Errorf("failed to create worktree: %w", err)
+	}
+
+	return path, nil
 }
 
 // runStandardCheckout handles standard single-repo worktree creation
@@ -42,43 +69,10 @@ func runStandardCheckout(cfg *internal.Config, repo *internal.GitRepo, branch st
 		return nil
 	}
 
-	// Worktree doesn't exist, check if branch exists
-	branchExists, err := repo.BranchExists(branch)
-	if err != nil {
-		return fmt.Errorf("failed to check if branch exists: %w", err)
-	}
-
-	createNewBranch := false
-	if !branchExists {
-		// Check if branch exists on remote
-		remoteBranchExists, err := repo.RemoteBranchExists(branch)
-		if err != nil {
-			return fmt.Errorf("failed to check remote branches: %w", err)
-		}
-
-		if remoteBranchExists {
-			// Create tracking branch
-			fmt.Printf("Creating local branch '%s' tracking 'origin/%s'...\n", branch, branch)
-			err = repo.CreateTrackingBranch(branch)
-			if err != nil {
-				return fmt.Errorf("failed to create tracking branch: %w", err)
-			}
-		} else {
-			// Branch doesn't exist anywhere, create it
-			// If no base branch specified, use the default branch
-			if baseBranch == "" {
-				baseBranch = repo.GetDefaultBranch()
-			}
-			fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
-			createNewBranch = true
-		}
-	}
-
-	// Create the worktree
 	fmt.Printf("Creating worktree for branch: %s\n", branch)
-	worktreePath, err := internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch)
+	worktreePath, err := ensureBranchAndCreateWorktree(cfg, repo, branch, baseBranch)
 	if err != nil {
-		return fmt.Errorf("failed to create worktree: %w", err)
+		return err
 	}
 
 	fmt.Printf("Worktree created at: %s\n", worktreePath)

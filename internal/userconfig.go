@@ -9,22 +9,29 @@ import (
 	"strings"
 )
 
+// EditorConfig holds editor-related settings.
+type EditorConfig struct {
+	Command string `json:"command"`
+}
+
 // UserConfig holds user-facing persistent settings (distinct from the runtime Config).
 type UserConfig struct {
-	Editor string `json:"editor"`
+	Editor EditorConfig `json:"editor"`
 }
 
 // DefaultUserConfig returns a UserConfig populated with default values.
 func DefaultUserConfig() UserConfig {
 	return UserConfig{
-		Editor: "cursor",
+		Editor: EditorConfig{
+			Command: "cursor",
+		},
 	}
 }
 
 // validKeys returns the set of recognised configuration key names.
 func validKeys() map[string]bool {
 	return map[string]bool{
-		"editor": true,
+		"editor.command": true,
 	}
 }
 
@@ -111,8 +118,8 @@ func ValidKeyNames() []string {
 // GetConfigValue returns the string value of the given config key.
 func (c *UserConfig) GetConfigValue(key string) (string, error) {
 	switch NormalizeKey(key) {
-	case "editor":
-		return c.Editor, nil
+	case "editor.command":
+		return c.Editor.Command, nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s (valid keys: %s)", key, strings.Join(ValidKeyNames(), ", "))
 	}
@@ -121,8 +128,8 @@ func (c *UserConfig) GetConfigValue(key string) (string, error) {
 // SetConfigValue sets the value of the given config key.
 func (c *UserConfig) SetConfigValue(key, value string) error {
 	switch NormalizeKey(key) {
-	case "editor":
-		c.Editor = value
+	case "editor.command":
+		c.Editor.Command = value
 		return nil
 	default:
 		return fmt.Errorf("unknown config key: %s (valid keys: %s)", key, strings.Join(ValidKeyNames(), ", "))

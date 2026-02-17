@@ -9,8 +9,8 @@ import (
 
 func TestDefaultUserConfig(t *testing.T) {
 	cfg := DefaultUserConfig()
-	if cfg.Editor != "cursor" {
-		t.Errorf("expected default editor to be 'cursor', got %q", cfg.Editor)
+	if cfg.Editor.Command != "cursor" {
+		t.Errorf("expected default editor command to be 'cursor', got %q", cfg.Editor.Command)
 	}
 }
 
@@ -19,8 +19,8 @@ func TestNormalizeKey(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"editor", "editor"},
-		{".editor", "editor"},
+		{"editor.command", "editor.command"},
+		{".editor.command", "editor.command"},
 		{"..editor", ".editor"}, // only one leading dot stripped
 		{"", ""},
 	}
@@ -38,8 +38,9 @@ func TestIsValidKey(t *testing.T) {
 		key  string
 		want bool
 	}{
-		{"editor", true},
-		{".editor", true},
+		{"editor.command", true},
+		{".editor.command", true},
+		{"editor", false},
 		{"bogus", false},
 		{"", false},
 	}
@@ -55,7 +56,7 @@ func TestIsValidKey(t *testing.T) {
 func TestGetConfigValue(t *testing.T) {
 	cfg := DefaultUserConfig()
 
-	val, err := cfg.GetConfigValue("editor")
+	val, err := cfg.GetConfigValue("editor.command")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestGetConfigValue(t *testing.T) {
 	}
 
 	// With leading dot
-	val, err = cfg.GetConfigValue(".editor")
+	val, err = cfg.GetConfigValue(".editor.command")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,19 +83,19 @@ func TestGetConfigValue(t *testing.T) {
 func TestSetConfigValue(t *testing.T) {
 	cfg := DefaultUserConfig()
 
-	if err := cfg.SetConfigValue("editor", "vim"); err != nil {
+	if err := cfg.SetConfigValue("editor.command", "vim"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Editor != "vim" {
-		t.Errorf("expected 'vim', got %q", cfg.Editor)
+	if cfg.Editor.Command != "vim" {
+		t.Errorf("expected 'vim', got %q", cfg.Editor.Command)
 	}
 
 	// With leading dot
-	if err := cfg.SetConfigValue(".editor", "code"); err != nil {
+	if err := cfg.SetConfigValue(".editor.command", "code"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Editor != "code" {
-		t.Errorf("expected 'code', got %q", cfg.Editor)
+	if cfg.Editor.Command != "code" {
+		t.Errorf("expected 'code', got %q", cfg.Editor.Command)
 	}
 
 	// Invalid key
@@ -110,7 +111,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 
 	// Patch UserConfigPath by saving directly to the temp path
 	cfg := DefaultUserConfig()
-	cfg.Editor = "neovim"
+	cfg.Editor.Command = "neovim"
 
 	// Create dir and write
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
@@ -132,8 +133,8 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		t.Fatalf("failed to load: %v", err)
 	}
 
-	if loaded.Editor != "neovim" {
-		t.Errorf("round-trip: expected editor 'neovim', got %q", loaded.Editor)
+	if loaded.Editor.Command != "neovim" {
+		t.Errorf("round-trip: expected editor command 'neovim', got %q", loaded.Editor.Command)
 	}
 }
 
@@ -142,8 +143,8 @@ func TestLoadConfigFromMissingFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error for missing file: %v", err)
 	}
-	if cfg.Editor != "cursor" {
-		t.Errorf("expected default editor 'cursor', got %q", cfg.Editor)
+	if cfg.Editor.Command != "cursor" {
+		t.Errorf("expected default editor command 'cursor', got %q", cfg.Editor.Command)
 	}
 }
 
@@ -155,12 +156,12 @@ func TestValidKeyNames(t *testing.T) {
 
 	found := false
 	for _, n := range names {
-		if n == "editor" {
+		if n == "editor.command" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected 'editor' in valid key names")
+		t.Error("expected 'editor.command' in valid key names")
 	}
 }
 
@@ -175,15 +176,15 @@ func TestSetConfigValueWithSpaces(t *testing.T) {
 	cfg := DefaultUserConfig()
 
 	// Simulate what happens when the CLI joins multi-word args with spaces
-	if err := cfg.SetConfigValue("editor", "/usr/local/bin/my editor"); err != nil {
+	if err := cfg.SetConfigValue("editor.command", "/usr/local/bin/my editor"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Editor != "/usr/local/bin/my editor" {
-		t.Errorf("expected '/usr/local/bin/my editor', got %q", cfg.Editor)
+	if cfg.Editor.Command != "/usr/local/bin/my editor" {
+		t.Errorf("expected '/usr/local/bin/my editor', got %q", cfg.Editor.Command)
 	}
 
 	// Verify round-trip preserves spaces
-	val, err := cfg.GetConfigValue("editor")
+	val, err := cfg.GetConfigValue("editor.command")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -197,7 +198,7 @@ func TestSaveAndLoadRoundTripWithSpaces(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "wt", "config.json")
 
 	cfg := DefaultUserConfig()
-	cfg.Editor = "code --wait"
+	cfg.Editor.Command = "code --wait"
 
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		t.Fatalf("failed to create dir: %v", err)
@@ -216,7 +217,7 @@ func TestSaveAndLoadRoundTripWithSpaces(t *testing.T) {
 		t.Fatalf("failed to load: %v", err)
 	}
 
-	if loaded.Editor != "code --wait" {
-		t.Errorf("round-trip: expected 'code --wait', got %q", loaded.Editor)
+	if loaded.Editor.Command != "code --wait" {
+		t.Errorf("round-trip: expected 'code --wait', got %q", loaded.Editor.Command)
 	}
 }
