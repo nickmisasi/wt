@@ -77,6 +77,13 @@ func run() error {
 		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
 		return cmd.RunCursor(config, gitRepo, branch, baseBranch, noClaudeDocs)
 
+	case "edit":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: wt edit <branch> [-b|--base <base-branch>] [-n|--no-claude-docs]")
+		}
+		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
+		return cmd.RunEdit(config, gitRepo, branch, baseBranch, noClaudeDocs)
+
 	case "t", "toggle":
 		return cmd.RunToggle()
 

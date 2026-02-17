@@ -16,7 +16,8 @@ COMMANDS:
     co <branch> [-b <base>] [-n] Checkout/create worktree for branch and switch to it
     rm <branch> [-f]             Remove a worktree for branch (use -f to force)
     clean                        Remove stale worktrees (clean, >30 days old)
-    cursor <branch> [-b <base>] [-n]  Open Cursor editor for branch's worktree
+    edit <branch> [-b <base>] [-n]   Open configured editor for branch's worktree
+    cursor                           (deprecated) Alias for 'edit'
     port                         Show current worktree's mapped ports
     t, toggle                    Return to parent repository from worktree
     config                       Manage configuration (get/set/show)
@@ -63,7 +64,7 @@ EXAMPLES:
     wt co MM-12345               # Creates dual worktree with auto ports
     wt co MM-12345 -b master     # Create from master branch
     wt rm MM-12345               # Removes both worktrees
-    wt cursor MM-12345           # Open in Cursor
+    wt edit MM-12345             # Open in configured editor
     wt port                      # Show server ports
 
     # Navigation
