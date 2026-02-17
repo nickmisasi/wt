@@ -31,6 +31,10 @@ func run() error {
 		return cmd.RunInstall()
 	}
 
+	if args[0] == "config" {
+		return cmd.RunConfig(args[1:])
+	}
+
 	// For all other commands, we need to be in a git repo
 	gitRepo, err := internal.NewGitRepo()
 	if err != nil {
