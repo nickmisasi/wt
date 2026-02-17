@@ -613,9 +613,13 @@ func TestCreateMattermostDualWorktree_EnterpriseFallback(t *testing.T) {
 
 	// Create the required server/config/config.json in the mattermost repo
 	configDir := filepath.Join(mattermostPath, "server", "config")
-	os.MkdirAll(configDir, 0755)
-	os.WriteFile(filepath.Join(configDir, "config.json"),
-		[]byte(`{"ServiceSettings":{"ListenAddress":":8065"}}`), 0644)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"),
+		[]byte(`{"ServiceSettings":{"ListenAddress":":8065"}}`), 0644); err != nil {
+		t.Fatalf("failed to write config.json: %v", err)
+	}
 
 	mc := &MattermostConfig{
 		WorkspaceRoot:    tmpDir,
