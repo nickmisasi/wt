@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -45,30 +46,12 @@ func RunToggle() error {
 			targetRepo = filepath.Join(workspaceRoot, "mattermost")
 		}
 	} else {
-		// Standard worktree - extract repo name from worktree directory
-		// Pattern: ~/workspace/worktrees/<repo-name>-<branch-name>/
-		relPath, err := filepath.Rel(worktreesDir, cwd)
+		// Use git worktree list to find the parent repository
+		// The first entry in the list is always the main repository
+		targetRepo, err = getParentRepositoryPath()
 		if err != nil {
-			return fmt.Errorf("failed to determine relative path: %w", err)
+			return fmt.Errorf("failed to determine parent repository: %w", err)
 		}
-
-		// Get the worktree root directory name
-		parts := strings.Split(relPath, string(filepath.Separator))
-		if len(parts) == 0 {
-			return fmt.Errorf("could not determine worktree directory")
-		}
-
-		worktreeDirName := parts[0]
-
-		// Extract repo name from pattern: <repo-name>-<branch-name>
-		// Find the last dash to separate repo from branch
-		lastDash := strings.LastIndex(worktreeDirName, "-")
-		if lastDash == -1 {
-			return fmt.Errorf("could not determine repository name from worktree directory")
-		}
-
-		repoName := worktreeDirName[:lastDash]
-		targetRepo = filepath.Join(workspaceRoot, repoName)
 	}
 
 	// Verify target repository exists
@@ -81,4 +64,25 @@ func RunToggle() error {
 	fmt.Printf("%s%s\n", internal.CDMarker, targetRepo)
 
 	return nil
+}
+
+// getParentRepositoryPath uses git worktree list to find the parent repository path
+func getParentRepositoryPath() (string, error) {
+	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to list worktrees: %w", err)
+	}
+
+	// Parse the output - the first "worktree" entry is the main repository
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "worktree ") {
+			path := strings.TrimPrefix(line, "worktree ")
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("no parent repository found in git worktree list")
 }
