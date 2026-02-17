@@ -547,6 +547,9 @@ func TestSequentialFallback(t *testing.T) {
 // and optionally creates additional branches.
 func setupTestGitRepo(t *testing.T, path string, extraBranches ...string) {
 	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available on PATH")
+	}
 	if err := os.MkdirAll(path, 0755); err != nil {
 		t.Fatalf("failed to create repo directory %s: %v", path, err)
 	}
