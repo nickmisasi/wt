@@ -181,6 +181,25 @@ func GetWorktreeByBranch(config *Config, branch string) (*WorktreeInfo, error) {
 	return nil, fmt.Errorf("worktree not found for branch: %s", branch)
 }
 
+// CopyClaudeConfig copies the .claude/ directory from srcRoot into dstRoot.
+// It is a no-op when the source directory does not exist. Errors are printed
+// as warnings rather than propagated so that worktree creation is not blocked.
+func CopyClaudeConfig(srcRoot, dstRoot string) {
+	src := filepath.Join(srcRoot, ".claude")
+	if _, err := os.Stat(src); err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Printf("Warning: cannot access .claude/ directory: %v\n", err)
+		}
+		return
+	}
+
+	dst := filepath.Join(dstRoot, ".claude")
+	fmt.Println("Copying Claude settings...")
+	if err := copyDir(src, dst); err != nil {
+		fmt.Printf("Warning: failed to copy .claude/ directory: %v\n", err)
+	}
+}
+
 // GetBranchNameFromWorktreePath extracts the branch name from a worktree path
 func GetBranchNameFromWorktreePath(config *Config, path string) string {
 	// Get the directory name

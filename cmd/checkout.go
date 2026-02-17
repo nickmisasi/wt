@@ -81,6 +81,8 @@ func runStandardCheckout(cfg *internal.Config, repo *internal.GitRepo, branch st
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
 
+	internal.CopyClaudeConfig(cfg.RepoRoot, worktreePath)
+
 	fmt.Printf("Worktree created at: %s\n", worktreePath)
 	fmt.Printf("%s%s\n", internal.CDMarker, worktreePath)
 

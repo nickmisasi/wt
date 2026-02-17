@@ -79,6 +79,7 @@ func runStandardCursor(cfg *internal.Config, repo *internal.GitRepo, branch stri
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}
 		fmt.Printf("Worktree created at: %s\n", path)
+		internal.CopyClaudeConfig(cfg.RepoRoot, path)
 		worktreeCreated = true
 	}
 
