@@ -292,6 +292,10 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 		return "", fmt.Errorf("failed to copy additional files: %w", err)
 	}
 
+	// Copy Claude settings from source repos into worktrees
+	CopyClaudeConfig(mc.MattermostPath, mattermostWorktreePath)
+	CopyClaudeConfig(mc.EnterprisePath, enterpriseWorktreePath)
+
 	// Update config.json with unique ports
 	configPath := filepath.Join(targetDir, "mattermost-"+sanitizedBranch, "server", "config", "config.json")
 	if _, err := os.Stat(configPath); err == nil {
@@ -418,6 +422,18 @@ func copyDir(src, dst string) error {
 	for _, entry := range entries {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
+
+		// Handle symlinks: recreate the link rather than following it
+		if entry.Type()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(srcPath)
+			if err != nil {
+				return err
+			}
+			if err := os.Symlink(target, dstPath); err != nil {
+				return err
+			}
+			continue
+		}
 
 		if entry.IsDir() {
 			if err := copyDir(srcPath, dstPath); err != nil {
