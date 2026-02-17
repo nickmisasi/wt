@@ -4,9 +4,62 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/nickmisasi/wt/internal"
 )
+
+// RunEditHere opens the configured editor on the current worktree (no branch argument needed)
+func RunEditHere() error {
+	// Load user config to get editor
+	userCfg, err := internal.LoadUserConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load user config: %w", err)
+	}
+
+	editor := userCfg.Editor
+	if editor == "" {
+		return fmt.Errorf("no editor configured. Set one with: wt config set editor <editor>")
+	}
+
+	if _, err := exec.LookPath(editor); err != nil {
+		return fmt.Errorf("editor %q not found in PATH", editor)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	worktreesDir := filepath.Join(homeDir, "workspace", "worktrees")
+
+	if !strings.HasPrefix(cwd, worktreesDir) {
+		return fmt.Errorf("not in a worktree directory. Usage: wt edit <branch>")
+	}
+
+	// Extract worktree root (first path component under worktreesDir)
+	relPath, err := filepath.Rel(worktreesDir, cwd)
+	if err != nil {
+		return fmt.Errorf("failed to determine relative path: %w", err)
+	}
+
+	parts := strings.Split(relPath, string(filepath.Separator))
+	if len(parts) == 0 || parts[0] == "." {
+		return fmt.Errorf("not in a worktree directory. Usage: wt edit <branch>")
+	}
+
+	worktreeRoot := filepath.Join(worktreesDir, parts[0])
+
+	fmt.Printf("Opening %s in %s\n", editor, worktreeRoot)
+	cmd := exec.Command(editor, worktreeRoot)
+	return cmd.Start()
+}
 
 // RunEdit opens the user-configured editor for the given branch's worktree
 func RunEdit(config interface{}, gitRepo interface{}, branch string, baseBranch string, noClaudeDocs bool) error {

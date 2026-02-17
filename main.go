@@ -79,7 +79,7 @@ func run() error {
 
 	case "edit":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: wt edit <branch> [-b|--base <base-branch>] [-n|--no-claude-docs]")
+			return cmd.RunEditHere()
 		}
 		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
 		return cmd.RunEdit(config, gitRepo, branch, baseBranch, noClaudeDocs)

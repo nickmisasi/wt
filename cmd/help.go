@@ -16,7 +16,7 @@ COMMANDS:
     co <branch> [-b <base>] [-n] Checkout/create worktree for branch and switch to it
     rm <branch> [-f]             Remove a worktree for branch (use -f to force)
     clean                        Remove stale worktrees (clean, >30 days old)
-    edit <branch> [-b <base>] [-n]   Open configured editor for branch's worktree
+    edit [<branch>] [-b <base>] [-n] Open configured editor (current worktree if no branch)
     cursor                           (deprecated) Alias for 'edit'
     port                         Show current worktree's mapped ports
     t, toggle                    Return to parent repository from worktree
