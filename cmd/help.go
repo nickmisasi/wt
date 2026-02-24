@@ -16,9 +16,11 @@ COMMANDS:
     co <branch> [-b <base>] [-n] Checkout/create worktree for branch and switch to it
     rm <branch> [-f]             Remove a worktree for branch (use -f to force)
     clean                        Remove stale worktrees (clean, >30 days old)
-    cursor <branch> [-b <base>] [-n]  Open Cursor editor for branch's worktree
+    edit [<branch>] [-b <base>] [-n] Open configured editor (current worktree if no branch)
+    cursor                           (deprecated) Alias for 'edit'
     port                         Show current worktree's mapped ports
     t, toggle                    Return to parent repository from worktree
+    config                       Manage configuration (get/set/show)
     install                      Install shell integration and completions
     help                         Show this help message
 
@@ -62,12 +64,20 @@ EXAMPLES:
     wt co MM-12345               # Creates dual worktree with auto ports
     wt co MM-12345 -b master     # Create from master branch
     wt rm MM-12345               # Removes both worktrees
-    wt cursor MM-12345           # Open in Cursor
+    wt edit MM-12345             # Open in configured editor
     wt port                      # Show server ports
 
     # Navigation
     cd ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345
     wt t                         # Return to ~/workspace/mattermost
+
+CONFIGURATION:
+    wt config show              Show all configuration values (JSON)
+    wt config get <key>         Get a configuration value
+    wt config set <key> <value> Set a configuration value
+
+    Available keys:
+        editor                  Editor command to use (default: cursor)
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.

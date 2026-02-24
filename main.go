@@ -31,6 +31,10 @@ func run() error {
 		return cmd.RunInstall()
 	}
 
+	if args[0] == "config" {
+		return cmd.RunConfig(args[1:])
+	}
+
 	// For all other commands, we need to be in a git repo
 	gitRepo, err := internal.NewGitRepo()
 	if err != nil {
@@ -72,6 +76,13 @@ func run() error {
 		}
 		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
 		return cmd.RunCursor(config, gitRepo, branch, baseBranch, noClaudeDocs)
+
+	case "edit":
+		if len(args) < 2 {
+			return cmd.RunEditHere()
+		}
+		branch, baseBranch, noClaudeDocs := parseCheckoutArgs(args[1:])
+		return cmd.RunEdit(config, gitRepo, branch, baseBranch, noClaudeDocs)
 
 	case "t", "toggle":
 		return cmd.RunToggle()

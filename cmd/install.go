@@ -71,12 +71,14 @@ _wt() {
                 'rm[Remove a worktree]' \
                 'clean[Remove stale worktrees]' \
                 'cursor[Open Cursor editor]' \
+                'edit[Open configured editor]' \
+                'config[Manage configuration]' \
                 'install[Install shell integration]' \
                 'help[Show help]'
             ;;
         args)
             case $line[1] in
-                co|cursor)
+                co|cursor|edit)
                     _arguments \
                         '1:branch:_wt_complete_branches' \
                         '-b[Base branch]:base branch:_wt_complete_branches' \
@@ -89,6 +91,10 @@ _wt() {
                         '1:branch:_wt_complete_branches' \
                         '-f[Force removal]' \
                         '--force[Force removal]'
+                    ;;
+                config)
+                    _arguments \
+                        '1:subcommand:(get set show)'
                     ;;
             esac
             ;;
