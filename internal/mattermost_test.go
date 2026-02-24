@@ -6,7 +6,9 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -539,5 +541,154 @@ func TestSequentialFallback(t *testing.T) {
 			t.Log("All ports were unavailable - this is expected only if system ports are exhausted")
 		}
 	})
+}
+
+// setupTestGitRepo initializes a git repo at path with an initial commit on "main"
+// and optionally creates additional branches.
+func setupTestGitRepo(t *testing.T, path string, extraBranches ...string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available on PATH")
+	}
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatalf("failed to create repo directory %s: %v", path, err)
+	}
+
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", path}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed in %s: %v\n%s", args, path, err, out)
+		}
+	}
+
+	run("init", "-b", "main")
+	run("config", "user.email", "test@test.com")
+	run("config", "user.name", "Test")
+
+	if err := os.WriteFile(filepath.Join(path, "README.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to write README.md: %v", err)
+	}
+	run("add", ".")
+	run("commit", "-m", "initial commit")
+
+	for _, branch := range extraBranches {
+		if branch != "main" {
+			run("branch", branch)
+		}
+	}
+}
+
+// TestCreateWorktreeForRepo_BaseBranchNotFound verifies that createWorktreeForRepo
+// returns an error containing "not found in" when the base branch doesn't exist.
+func TestCreateWorktreeForRepo_BaseBranchNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoPath := filepath.Join(tmpDir, "repo")
+	setupTestGitRepo(t, repoPath)
+
+	repo := &GitRepo{Root: repoPath, Name: "test-repo"}
+	worktreePath := filepath.Join(tmpDir, "wt-test")
+
+	err := createWorktreeForRepo(repo, "new-branch", "nonexistent-base", worktreePath)
+	if err == nil {
+		t.Fatal("expected error when base branch doesn't exist, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found in") {
+		t.Errorf("expected error to contain 'not found in', got: %v", err)
+	}
+}
+
+// TestCreateMattermostDualWorktree_EnterpriseFallback verifies that when the base
+// branch doesn't exist in the enterprise repo, the function falls back to the
+// enterprise repo's default branch instead of failing.
+func TestCreateMattermostDualWorktree_EnterpriseFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	mattermostPath := filepath.Join(tmpDir, "mattermost")
+	enterprisePath := filepath.Join(tmpDir, "enterprise")
+	worktreeBasePath := filepath.Join(tmpDir, "worktrees")
+
+	// Mattermost repo has main + release-1.0
+	setupTestGitRepo(t, mattermostPath, "release-1.0")
+	// Enterprise repo only has main (no release-1.0)
+	setupTestGitRepo(t, enterprisePath)
+
+	// Create the required server/config/config.json in the mattermost repo
+	configDir := filepath.Join(mattermostPath, "server", "config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"),
+		[]byte(`{"ServiceSettings":{"ListenAddress":":8065"}}`), 0644); err != nil {
+		t.Fatalf("failed to write config.json: %v", err)
+	}
+
+	mc := &MattermostConfig{
+		WorkspaceRoot:    tmpDir,
+		MattermostPath:   mattermostPath,
+		EnterprisePath:   enterprisePath,
+		WorktreeBasePath: worktreeBasePath,
+		ServerPort:       8200,
+		MetricsPort:      8202,
+	}
+
+	// Create worktree with baseBranch that only exists in mattermost, not enterprise.
+	// Enterprise should fall back to its default branch ("main") instead of failing.
+	result, err := CreateMattermostDualWorktree(mc, "test-branch", "release-1.0")
+	if err != nil {
+		t.Fatalf("expected success with enterprise fallback, got error: %v", err)
+	}
+
+	// Verify the worktree directory was created
+	if _, err := os.Stat(result); os.IsNotExist(err) {
+		t.Errorf("expected worktree directory to exist at %s", result)
+	}
+
+	// Verify both mattermost and enterprise worktree subdirs exist
+	sanitized := SanitizeBranchName("test-branch")
+	mmWorktree := filepath.Join(result, "mattermost-"+sanitized)
+	entWorktree := filepath.Join(result, "enterprise-"+sanitized)
+
+	if _, err := os.Stat(mmWorktree); os.IsNotExist(err) {
+		t.Errorf("expected mattermost worktree at %s", mmWorktree)
+	}
+	if _, err := os.Stat(entWorktree); os.IsNotExist(err) {
+		t.Errorf("expected enterprise worktree at %s", entWorktree)
+	}
+}
+
+// TestCreateMattermostDualWorktree_BothReposHaveBranch verifies the normal case
+// where the base branch exists in both repos (no fallback needed).
+func TestCreateMattermostDualWorktree_BothReposHaveBranch(t *testing.T) {
+	tmpDir := t.TempDir()
+	mattermostPath := filepath.Join(tmpDir, "mattermost")
+	enterprisePath := filepath.Join(tmpDir, "enterprise")
+	worktreeBasePath := filepath.Join(tmpDir, "worktrees")
+
+	// Both repos have main + release-1.0
+	setupTestGitRepo(t, mattermostPath, "release-1.0")
+	setupTestGitRepo(t, enterprisePath, "release-1.0")
+
+	// Create the required server/config/config.json
+	configDir := filepath.Join(mattermostPath, "server", "config")
+	os.MkdirAll(configDir, 0755)
+	os.WriteFile(filepath.Join(configDir, "config.json"),
+		[]byte(`{"ServiceSettings":{"ListenAddress":":8065"}}`), 0644)
+
+	mc := &MattermostConfig{
+		WorkspaceRoot:    tmpDir,
+		MattermostPath:   mattermostPath,
+		EnterprisePath:   enterprisePath,
+		WorktreeBasePath: worktreeBasePath,
+		ServerPort:       8300,
+		MetricsPort:      8302,
+	}
+
+	result, err := CreateMattermostDualWorktree(mc, "test-branch-2", "release-1.0")
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+
+	if _, err := os.Stat(result); os.IsNotExist(err) {
+		t.Errorf("expected worktree directory to exist at %s", result)
+	}
 }
 
