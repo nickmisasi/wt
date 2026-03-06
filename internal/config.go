@@ -1,15 +1,13 @@
 package internal
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 )
 
 const (
-	WorktreeBaseDir = "worktrees"
-	CDMarker        = "__WT_CD__:"
-	CMDMarker       = "__WT_CMD__:"
+	CDMarker  = "__WT_CD__:"
+	CMDMarker = "__WT_CMD__:"
 )
 
 // Config holds the configuration for the worktree manager
@@ -21,13 +19,13 @@ type Config struct {
 
 // NewConfig creates a new configuration instance
 func NewConfig() (*Config, error) {
-	homeDir, err := os.UserHomeDir()
+	worktreesPath, err := ResolveWorktreesPath()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Config{
-		WorktreeBasePath: filepath.Join(homeDir, "workspace", WorktreeBaseDir),
+		WorktreeBasePath: worktreesPath,
 	}, nil
 }
 

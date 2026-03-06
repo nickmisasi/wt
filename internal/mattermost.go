@@ -69,38 +69,42 @@ var enterpriseFiles = []FileCopyConfig{
 
 // IsMattermostRepo checks if the given repo is the mattermost repository
 func IsMattermostRepo(repo *GitRepo) bool {
-	// Check if repo name is "mattermost"
 	if repo.Name != "mattermost" {
 		return false
 	}
 
-	// Additional validation: check if enterprise repo exists alongside it
-	homeDir, err := os.UserHomeDir()
+	enterprisePath, err := ResolveEnterprisePath()
 	if err != nil {
 		return false
 	}
 
-	workspaceRoot := filepath.Join(homeDir, "workspace")
-	enterprisePath := filepath.Join(workspaceRoot, "enterprise")
-
-	// If enterprise repo exists, this is definitely the mattermost setup
 	return isGitRepo(enterprisePath)
 }
 
 // NewMattermostConfig creates a new Mattermost configuration
 func NewMattermostConfig() (*MattermostConfig, error) {
-	homeDir, err := os.UserHomeDir()
+	workspaceRoot, err := ResolveWorkspaceRoot()
+	if err != nil {
+		return nil, err
+	}
+	mattermostPath, err := ResolveMattermostPath()
+	if err != nil {
+		return nil, err
+	}
+	enterprisePath, err := ResolveEnterprisePath()
+	if err != nil {
+		return nil, err
+	}
+	worktreesPath, err := ResolveWorktreesPath()
 	if err != nil {
 		return nil, err
 	}
 
-	workspaceRoot := filepath.Join(homeDir, "workspace")
-
 	return &MattermostConfig{
 		WorkspaceRoot:    workspaceRoot,
-		MattermostPath:   filepath.Join(workspaceRoot, "mattermost"),
-		EnterprisePath:   filepath.Join(workspaceRoot, "enterprise"),
-		WorktreeBasePath: filepath.Join(workspaceRoot, "worktrees"),
+		MattermostPath:   mattermostPath,
+		EnterprisePath:   enterprisePath,
+		WorktreeBasePath: worktreesPath,
 		ServerPort:       8065,
 		MetricsPort:      8067,
 	}, nil
@@ -109,11 +113,11 @@ func NewMattermostConfig() (*MattermostConfig, error) {
 // ValidateMattermostSetup checks if the required repositories exist
 func (mc *MattermostConfig) ValidateMattermostSetup() error {
 	if !isGitRepo(mc.MattermostPath) {
-		return fmt.Errorf("mattermost repository not found at %s\n\nPlease ensure you have cloned mattermost/mattermost to ~/workspace/mattermost", mc.MattermostPath)
+		return fmt.Errorf("mattermost repository not found at %s\n\nPlease clone mattermost/mattermost there before continuing", mc.MattermostPath)
 	}
 
 	if !isGitRepo(mc.EnterprisePath) {
-		return fmt.Errorf("enterprise repository not found at %s\n\nPlease ensure you have cloned mattermost/enterprise to ~/workspace/enterprise", mc.EnterprisePath)
+		return fmt.Errorf("enterprise repository not found at %s\n\nPlease clone mattermost/enterprise there before continuing", mc.EnterprisePath)
 	}
 
 	// Ensure worktrees directory exists
@@ -268,14 +272,14 @@ func CreateMattermostDualWorktree(mc *MattermostConfig, branch string, baseBranc
 			if err := createWorktreeForRepo(enterpriseRepo, branch, defaultBranch, enterpriseWorktreePath); err != nil {
 				cleanup()
 				if strings.Contains(err.Error(), "already used by worktree") {
-					return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd ~/workspace/enterprise\n  git worktree prune\n\nThen try again", err)
+					return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd %s\n  git worktree prune\n\nThen try again", err, mc.EnterprisePath)
 				}
 				return "", fmt.Errorf("failed to create enterprise worktree: %w", err)
 			}
 		} else {
 			cleanup()
 			if strings.Contains(err.Error(), "already used by worktree") {
-				return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd ~/workspace/enterprise\n  git worktree prune\n\nThen try again", err)
+				return "", fmt.Errorf("failed to create enterprise worktree: %w\n\nTo fix this, run these commands:\n  cd %s\n  git worktree prune\n\nThen try again", err, mc.EnterprisePath)
 			}
 			return "", fmt.Errorf("failed to create enterprise worktree: %w", err)
 		}
@@ -403,18 +407,30 @@ func copyFilesExcept(src, dst string, exclusions []string) error {
 		srcPath := filepath.Join(src, name)
 		dstPath := filepath.Join(dst, name)
 
-		if entry.IsDir() {
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := copyFile(srcPath, dstPath); err != nil {
-				return err
-			}
+		if err := copyEntry(srcPath, dstPath, entry); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+// copyEntry copies a single directory entry, dispatching symlinks, directories,
+// and regular files appropriately.
+func copyEntry(srcPath, dstPath string, entry os.DirEntry) error {
+	if entry.Type()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(srcPath)
+		if err != nil {
+			return err
+		}
+		return os.Symlink(target, dstPath)
+	}
+
+	if entry.IsDir() {
+		return copyDir(srcPath, dstPath)
+	}
+
+	return copyFile(srcPath, dstPath)
 }
 
 // copyDir recursively copies a directory
@@ -432,14 +448,8 @@ func copyDir(src, dst string) error {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
-		if entry.IsDir() {
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := copyFile(srcPath, dstPath); err != nil {
-				return err
-			}
+		if err := copyEntry(srcPath, dstPath, entry); err != nil {
+			return err
 		}
 	}
 

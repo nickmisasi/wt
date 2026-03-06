@@ -10,6 +10,17 @@ import (
 	"github.com/nickmisasi/wt/internal"
 )
 
+// isUnderDir checks whether child is inside or equal to parent, using a
+// trailing separator to avoid partial-name matches.
+func isUnderDir(child, parent string) bool {
+	c := filepath.Clean(child)
+	p := filepath.Clean(parent)
+	if c == p {
+		return true
+	}
+	return strings.HasPrefix(c, p+string(filepath.Separator))
+}
+
 // RunToggle switches from worktree back to parent repository
 func RunToggle() error {
 	// Get current directory
@@ -18,16 +29,12 @@ func RunToggle() error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	homeDir, err := os.UserHomeDir()
+	worktreesDir, err := internal.ResolveWorktreesPath()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to resolve worktrees path: %w", err)
 	}
 
-	workspaceRoot := filepath.Join(homeDir, "workspace")
-	worktreesDir := filepath.Join(workspaceRoot, "worktrees")
-
-	// Check if we're in a worktree directory
-	if !strings.HasPrefix(cwd, worktreesDir) {
+	if !isUnderDir(cwd, worktreesDir) {
 		return fmt.Errorf("not currently in a worktree directory")
 	}
 
@@ -36,14 +43,18 @@ func RunToggle() error {
 
 	// Check if we're in a Mattermost dual-repo worktree
 	if strings.Contains(cwd, "/mattermost-") {
-		// Could be in either mattermost/ or enterprise/ subdirectory
-		if strings.Contains(cwd, "/mattermost/") {
-			targetRepo = filepath.Join(workspaceRoot, "mattermost")
-		} else if strings.Contains(cwd, "/enterprise/") {
-			targetRepo = filepath.Join(workspaceRoot, "enterprise")
+		mattermostPath, mmErr := internal.ResolveMattermostPath()
+		enterprisePath, entErr := internal.ResolveEnterprisePath()
+
+		if strings.Contains(cwd, "/enterprise-") {
+			if entErr != nil {
+				return fmt.Errorf("failed to resolve enterprise path: %v", entErr)
+			}
+			targetRepo = enterprisePath
+		} else if mmErr == nil {
+			targetRepo = mattermostPath
 		} else {
-			// At the root of a mattermost worktree, default to mattermost repo
-			targetRepo = filepath.Join(workspaceRoot, "mattermost")
+			return fmt.Errorf("failed to resolve mattermost paths: %v", mmErr)
 		}
 	} else {
 		// Use git worktree list to find the parent repository

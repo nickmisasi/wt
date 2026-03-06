@@ -30,13 +30,14 @@ OPTIONS:
     -n, --no-claude-docs        Skip running enable-claude-docs.sh after worktree creation
 
 WORKTREE STORAGE:
-    Standard worktrees: ~/workspace/worktrees/<repo-name>-<branch-name>/
+    Standard worktrees: <worktrees.path>/<repo-name>-<branch-name>/
+    worktrees.path defaults to <workspace.root>/worktrees (configurable via 'wt config')
 
 MATTERMOST DUAL-REPOSITORY SUPPORT:
-    When working in the mattermost repository (~/workspace/mattermost), wt automatically
-    creates dual-repo worktrees that include both mattermost and enterprise repositories:
+    When working in the mattermost repository, wt automatically creates dual-repo
+    worktrees that include both mattermost and enterprise repositories:
 
-        ~/workspace/worktrees/mattermost-<branch-name>/
+        <worktrees.path>/mattermost-<branch-name>/
         ├── mattermost-<branch-name>/  (mattermost/mattermost worktree)
         ├── enterprise-<branch-name>/  (mattermost/enterprise worktree)
         ├── mattermost -> mattermost-<branch-name>/  (symlink for scripts)
@@ -49,9 +50,9 @@ MATTERMOST DUAL-REPOSITORY SUPPORT:
     - Updates config.json with auto-incremented ports (starting from 8065)
     - Runs 'make setup-go-work' after creation
 
-    Requirements:
-    - ~/workspace/mattermost (mattermost/mattermost repo)
-    - ~/workspace/enterprise (mattermost/enterprise repo)
+    Requirements (paths configurable via 'wt config'):
+    - mattermost/mattermost repo  (default: <workspace.root>/mattermost)
+    - mattermost/enterprise repo  (default: <workspace.root>/enterprise)
 
 EXAMPLES:
     # Standard repository
@@ -68,8 +69,7 @@ EXAMPLES:
     wt port                      # Show server ports
 
     # Navigation
-    cd ~/workspace/worktrees/mattermost-MM-12345/mattermost-MM-12345
-    wt t                         # Return to ~/workspace/mattermost
+    wt t                         # Return to parent repository from worktree
 
 CONFIGURATION:
     wt config show              Show all configuration values (JSON)
@@ -77,7 +77,14 @@ CONFIGURATION:
     wt config set <key> <value> Set a configuration value
 
     Available keys:
-        editor                  Editor command to use (default: cursor)
+        editor.command              Editor command (default: cursor)
+        workspace.root              Workspace root (default: ~/workspace)
+        worktrees.path              Worktrees directory (default: <workspace.root>/worktrees)
+        mattermost.path             Mattermost repo (default: <workspace.root>/mattermost)
+        mattermost.enterprise_path  Enterprise repo (default: <workspace.root>/enterprise)
+
+    Relative paths resolve from $HOME; absolute paths are used as-is.
+    Re-run 'wt install' after changing paths to update shell integration.
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.

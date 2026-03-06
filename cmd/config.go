@@ -16,7 +16,14 @@ Subcommands:
     set <key> <value> Set a configuration value
 
 Available keys:
-    editor.command    Editor command to use (default: cursor)
+    editor.command              Editor command to use (default: cursor)
+    workspace.root              Workspace root directory (default: workspace)
+    worktrees.path              Worktrees directory (default: <workspace.root>/worktrees)
+    mattermost.path             Mattermost repo path (default: <workspace.root>/mattermost)
+    mattermost.enterprise_path  Enterprise repo path (default: <workspace.root>/enterprise)
+
+    Relative paths resolve from $HOME; absolute paths are used as-is.
+    When unset, worktrees/mattermost/enterprise paths derive from workspace.root.
 `
 
 // RunConfig routes config subcommands.
@@ -107,5 +114,20 @@ func runConfigSet(args []string) error {
 	}
 
 	fmt.Printf("%s = %s\n", internal.NormalizeKey(key), value)
+
+	normalizedKey := internal.NormalizeKey(key)
+	if isPathKey(normalizedKey) {
+		fmt.Println("Note: please re-run 'wt install' to update shell integration.")
+	}
+
 	return nil
+}
+
+var pathKeys = map[string]bool{
+	"workspace.root":             true,
+	"worktrees.path":             true,
+}
+
+func isPathKey(key string) bool {
+	return pathKeys[key]
 }

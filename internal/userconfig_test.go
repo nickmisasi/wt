@@ -12,6 +12,18 @@ func TestDefaultUserConfig(t *testing.T) {
 	if cfg.Editor.Command != "cursor" {
 		t.Errorf("expected default editor command to be 'cursor', got %q", cfg.Editor.Command)
 	}
+	if cfg.Workspace.Root != "workspace" {
+		t.Errorf("expected default workspace root to be 'workspace', got %q", cfg.Workspace.Root)
+	}
+	if cfg.Worktrees.Path != "" {
+		t.Errorf("expected default worktrees path to be empty, got %q", cfg.Worktrees.Path)
+	}
+	if cfg.Mattermost.Path != "" {
+		t.Errorf("expected default mattermost path to be empty, got %q", cfg.Mattermost.Path)
+	}
+	if cfg.Mattermost.EnterprisePath != "" {
+		t.Errorf("expected default enterprise path to be empty, got %q", cfg.Mattermost.EnterprisePath)
+	}
 }
 
 func TestNormalizeKey(t *testing.T) {
@@ -40,6 +52,11 @@ func TestIsValidKey(t *testing.T) {
 	}{
 		{"editor.command", true},
 		{".editor.command", true},
+		{"workspace.root", true},
+		{".workspace.root", true},
+		{"worktrees.path", true},
+		{"mattermost.path", true},
+		{"mattermost.enterprise_path", true},
 		{"editor", false},
 		{"bogus", false},
 		{"", false},
@@ -73,6 +90,42 @@ func TestGetConfigValue(t *testing.T) {
 		t.Errorf("expected 'cursor', got %q", val)
 	}
 
+	// Workspace root
+	val, err = cfg.GetConfigValue("workspace.root")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "workspace" {
+		t.Errorf("expected 'workspace', got %q", val)
+	}
+
+	// Worktrees path (empty default)
+	val, err = cfg.GetConfigValue("worktrees.path")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "" {
+		t.Errorf("expected empty string, got %q", val)
+	}
+
+	// Mattermost path (empty default)
+	val, err = cfg.GetConfigValue("mattermost.path")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "" {
+		t.Errorf("expected empty string, got %q", val)
+	}
+
+	// Enterprise path (empty default)
+	val, err = cfg.GetConfigValue("mattermost.enterprise_path")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "" {
+		t.Errorf("expected empty string, got %q", val)
+	}
+
 	// Invalid key
 	_, err = cfg.GetConfigValue("bogus")
 	if err == nil {
@@ -98,6 +151,46 @@ func TestSetConfigValue(t *testing.T) {
 		t.Errorf("expected 'code', got %q", cfg.Editor.Command)
 	}
 
+	// Workspace root
+	if err := cfg.SetConfigValue("workspace.root", "mm"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Workspace.Root != "mm" {
+		t.Errorf("expected 'mm', got %q", cfg.Workspace.Root)
+	}
+
+	// Absolute path
+	if err := cfg.SetConfigValue("workspace.root", "/opt/repos"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Workspace.Root != "/opt/repos" {
+		t.Errorf("expected '/opt/repos', got %q", cfg.Workspace.Root)
+	}
+
+	// Worktrees path
+	if err := cfg.SetConfigValue("worktrees.path", "/tmp/wt"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Worktrees.Path != "/tmp/wt" {
+		t.Errorf("expected '/tmp/wt', got %q", cfg.Worktrees.Path)
+	}
+
+	// Mattermost path
+	if err := cfg.SetConfigValue("mattermost.path", "mm/server"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Mattermost.Path != "mm/server" {
+		t.Errorf("expected 'mm/server', got %q", cfg.Mattermost.Path)
+	}
+
+	// Enterprise path
+	if err := cfg.SetConfigValue("mattermost.enterprise_path", "mm/enterprise"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Mattermost.EnterprisePath != "mm/enterprise" {
+		t.Errorf("expected 'mm/enterprise', got %q", cfg.Mattermost.EnterprisePath)
+	}
+
 	// Invalid key
 	if err := cfg.SetConfigValue("bogus", "val"); err == nil {
 		t.Error("expected error for invalid key")
@@ -105,20 +198,20 @@ func TestSetConfigValue(t *testing.T) {
 }
 
 func TestSaveAndLoadRoundTrip(t *testing.T) {
-	// Use a temp directory as the config home
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "wt", "config.json")
 
-	// Patch UserConfigPath by saving directly to the temp path
 	cfg := DefaultUserConfig()
 	cfg.Editor.Command = "neovim"
+	cfg.Workspace.Root = "mm"
+	cfg.Worktrees.Path = "/opt/worktrees"
+	cfg.Mattermost.Path = "mm/mattermost"
+	cfg.Mattermost.EnterprisePath = "mm/enterprise"
 
-	// Create dir and write
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		t.Fatalf("failed to create dir: %v", err)
 	}
 
-	// Save using our helper (manually, since we can't override UserConfigPath easily)
 	data, err := marshalConfig(&cfg)
 	if err != nil {
 		t.Fatalf("failed to marshal: %v", err)
@@ -127,7 +220,6 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		t.Fatalf("failed to write: %v", err)
 	}
 
-	// Read back
 	loaded, err := loadConfigFromPath(configPath)
 	if err != nil {
 		t.Fatalf("failed to load: %v", err)
@@ -135,6 +227,18 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 
 	if loaded.Editor.Command != "neovim" {
 		t.Errorf("round-trip: expected editor command 'neovim', got %q", loaded.Editor.Command)
+	}
+	if loaded.Workspace.Root != "mm" {
+		t.Errorf("round-trip: expected workspace root 'mm', got %q", loaded.Workspace.Root)
+	}
+	if loaded.Worktrees.Path != "/opt/worktrees" {
+		t.Errorf("round-trip: expected worktrees path '/opt/worktrees', got %q", loaded.Worktrees.Path)
+	}
+	if loaded.Mattermost.Path != "mm/mattermost" {
+		t.Errorf("round-trip: expected mattermost path 'mm/mattermost', got %q", loaded.Mattermost.Path)
+	}
+	if loaded.Mattermost.EnterprisePath != "mm/enterprise" {
+		t.Errorf("round-trip: expected enterprise path 'mm/enterprise', got %q", loaded.Mattermost.EnterprisePath)
 	}
 }
 
@@ -191,6 +295,44 @@ func TestSetConfigValueWithSpaces(t *testing.T) {
 	if val != "/usr/local/bin/my editor" {
 		t.Errorf("round-trip: expected '/usr/local/bin/my editor', got %q", val)
 	}
+}
+
+func TestResolvePath(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to get home dir: %v", err)
+	}
+
+	t.Run("empty value uses workspace root + fallback", func(t *testing.T) {
+		got, err := resolvePath("", "/home/user/ws", "worktrees")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "/home/user/ws/worktrees" {
+			t.Errorf("expected '/home/user/ws/worktrees', got %q", got)
+		}
+	})
+
+	t.Run("absolute value used as-is", func(t *testing.T) {
+		got, err := resolvePath("/opt/my-worktrees", "/home/user/ws", "worktrees")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "/opt/my-worktrees" {
+			t.Errorf("expected '/opt/my-worktrees', got %q", got)
+		}
+	})
+
+	t.Run("relative value resolved from HOME", func(t *testing.T) {
+		got, err := resolvePath("mm/worktrees", "/home/user/ws", "worktrees")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := filepath.Join(homeDir, "mm/worktrees")
+		if got != expected {
+			t.Errorf("expected %q, got %q", expected, got)
+		}
+	})
 }
 
 func TestSaveAndLoadRoundTripWithSpaces(t *testing.T) {
