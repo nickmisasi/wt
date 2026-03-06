@@ -79,9 +79,9 @@ CONFIGURATION:
     Available keys:
         editor.command              Editor command (default: cursor)
         workspace.root              Workspace root (default: ~/workspace)
-        worktrees.path              Worktrees directory (default: <workspace>/worktrees)
-        mattermost.path             Mattermost repo (default: <workspace>/mattermost)
-        mattermost.enterprise_path  Enterprise repo (default: <workspace>/enterprise)
+        worktrees.path              Worktrees directory (default: <workspace.root>/worktrees)
+        mattermost.path             Mattermost repo (default: <workspace.root>/mattermost)
+        mattermost.enterprise_path  Enterprise repo (default: <workspace.root>/enterprise)
 
     Relative paths resolve from $HOME; absolute paths are used as-is.
     Re-run 'wt install' after changing paths to update shell integration.

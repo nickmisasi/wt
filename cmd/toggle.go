@@ -46,7 +46,7 @@ func RunToggle() error {
 		mattermostPath, mmErr := internal.ResolveMattermostPath()
 		enterprisePath, entErr := internal.ResolveEnterprisePath()
 
-		if entErr == nil && isUnderDir(cwd, enterprisePath) {
+		if entErr == nil && strings.Contains(cwd, "/enterprise-") {
 			targetRepo = enterprisePath
 		} else if mmErr == nil {
 			targetRepo = mattermostPath
