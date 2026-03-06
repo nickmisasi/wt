@@ -16,7 +16,14 @@ Subcommands:
     set <key> <value> Set a configuration value
 
 Available keys:
-    editor.command    Editor command to use (default: cursor)
+    editor.command              Editor command to use (default: cursor)
+    workspace.root              Workspace root directory (default: workspace)
+    worktrees.path              Worktrees directory (default: <workspace>/worktrees)
+    mattermost.path             Mattermost repo path (default: <workspace>/mattermost)
+    mattermost.enterprise_path  Enterprise repo path (default: <workspace>/enterprise)
+
+    Relative paths resolve from $HOME; absolute paths are used as-is.
+    When unset, worktrees/mattermost/enterprise paths derive from workspace.root.
 `
 
 // RunConfig routes config subcommands.

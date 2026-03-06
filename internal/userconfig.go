@@ -14,9 +14,28 @@ type EditorConfig struct {
 	Command string `json:"command"`
 }
 
+// WorkspaceConfig holds workspace-related settings.
+type WorkspaceConfig struct {
+	Root string `json:"root"`
+}
+
+// WorktreesConfig holds worktree-related settings.
+type WorktreesConfig struct {
+	Path string `json:"path"`
+}
+
+// MattermostPathsConfig holds paths to Mattermost repositories.
+type MattermostPathsConfig struct {
+	Path           string `json:"path"`
+	EnterprisePath string `json:"enterprise_path"`
+}
+
 // UserConfig holds user-facing persistent settings (distinct from the runtime Config).
 type UserConfig struct {
-	Editor EditorConfig `json:"editor"`
+	Editor    EditorConfig          `json:"editor"`
+	Workspace WorkspaceConfig      `json:"workspace"`
+	Worktrees WorktreesConfig      `json:"worktrees"`
+	Mattermost MattermostPathsConfig `json:"mattermost"`
 }
 
 // DefaultUserConfig returns a UserConfig populated with default values.
@@ -25,13 +44,20 @@ func DefaultUserConfig() UserConfig {
 		Editor: EditorConfig{
 			Command: "cursor",
 		},
+		Workspace: WorkspaceConfig{
+			Root: "workspace",
+		},
 	}
 }
 
 // validKeys returns the set of recognised configuration key names.
 func validKeys() map[string]bool {
 	return map[string]bool{
-		"editor.command": true,
+		"editor.command":              true,
+		"workspace.root":              true,
+		"worktrees.path":              true,
+		"mattermost.path":             true,
+		"mattermost.enterprise_path":  true,
 	}
 }
 
@@ -120,6 +146,14 @@ func (c *UserConfig) GetConfigValue(key string) (string, error) {
 	switch NormalizeKey(key) {
 	case "editor.command":
 		return c.Editor.Command, nil
+	case "workspace.root":
+		return c.Workspace.Root, nil
+	case "worktrees.path":
+		return c.Worktrees.Path, nil
+	case "mattermost.path":
+		return c.Mattermost.Path, nil
+	case "mattermost.enterprise_path":
+		return c.Mattermost.EnterprisePath, nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s (valid keys: %s)", key, strings.Join(ValidKeyNames(), ", "))
 	}
@@ -131,9 +165,104 @@ func (c *UserConfig) SetConfigValue(key, value string) error {
 	case "editor.command":
 		c.Editor.Command = value
 		return nil
+	case "workspace.root":
+		c.Workspace.Root = value
+		return nil
+	case "worktrees.path":
+		c.Worktrees.Path = value
+		return nil
+	case "mattermost.path":
+		c.Mattermost.Path = value
+		return nil
+	case "mattermost.enterprise_path":
+		c.Mattermost.EnterprisePath = value
+		return nil
 	default:
 		return fmt.Errorf("unknown config key: %s (valid keys: %s)", key, strings.Join(ValidKeyNames(), ", "))
 	}
+}
+
+// resolvePath resolves a configured path to an absolute path.
+// If value is non-empty and absolute, it is returned as-is.
+// If value is non-empty and relative, it is resolved relative to $HOME.
+// If value is empty, fallbackDir is joined to workspaceRoot.
+func resolvePath(value, workspaceRoot, fallbackDir string) (string, error) {
+	if value != "" {
+		if filepath.IsAbs(value) {
+			return value, nil
+		}
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		return filepath.Join(homeDir, value), nil
+	}
+	return filepath.Join(workspaceRoot, fallbackDir), nil
+}
+
+// ResolveWorkspaceRoot returns the absolute path to the workspace root directory.
+// If the configured value is an absolute path, it is used directly.
+// Otherwise, it is resolved relative to the user's home directory.
+func ResolveWorkspaceRoot() (string, error) {
+	cfg, err := LoadUserConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+
+	root := cfg.Workspace.Root
+
+	if filepath.IsAbs(root) {
+		return root, nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	return filepath.Join(homeDir, root), nil
+}
+
+// ResolveWorktreesPath returns the absolute path to the worktrees directory.
+// Defaults to <workspace_root>/worktrees when not explicitly configured.
+func ResolveWorktreesPath() (string, error) {
+	cfg, err := LoadUserConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+	workspaceRoot, err := ResolveWorkspaceRoot()
+	if err != nil {
+		return "", err
+	}
+	return resolvePath(cfg.Worktrees.Path, workspaceRoot, "worktrees")
+}
+
+// ResolveMattermostPath returns the absolute path to the mattermost repository.
+// Defaults to <workspace_root>/mattermost when not explicitly configured.
+func ResolveMattermostPath() (string, error) {
+	cfg, err := LoadUserConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+	workspaceRoot, err := ResolveWorkspaceRoot()
+	if err != nil {
+		return "", err
+	}
+	return resolvePath(cfg.Mattermost.Path, workspaceRoot, "mattermost")
+}
+
+// ResolveEnterprisePath returns the absolute path to the enterprise repository.
+// Defaults to <workspace_root>/enterprise when not explicitly configured.
+func ResolveEnterprisePath() (string, error) {
+	cfg, err := LoadUserConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+	workspaceRoot, err := ResolveWorkspaceRoot()
+	if err != nil {
+		return "", err
+	}
+	return resolvePath(cfg.Mattermost.EnterprisePath, workspaceRoot, "enterprise")
 }
 
 // marshalConfig serialises a UserConfig to indented JSON with a trailing newline.

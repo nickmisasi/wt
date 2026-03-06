@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/nickmisasi/wt/internal"
@@ -18,13 +17,10 @@ func RunToggle() error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	homeDir, err := os.UserHomeDir()
+	worktreesDir, err := internal.ResolveWorktreesPath()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to resolve worktrees path: %w", err)
 	}
-
-	workspaceRoot := filepath.Join(homeDir, "workspace")
-	worktreesDir := filepath.Join(workspaceRoot, "worktrees")
 
 	// Check if we're in a worktree directory
 	if !strings.HasPrefix(cwd, worktreesDir) {
@@ -36,14 +32,15 @@ func RunToggle() error {
 
 	// Check if we're in a Mattermost dual-repo worktree
 	if strings.Contains(cwd, "/mattermost-") {
-		// Could be in either mattermost/ or enterprise/ subdirectory
-		if strings.Contains(cwd, "/mattermost/") {
-			targetRepo = filepath.Join(workspaceRoot, "mattermost")
-		} else if strings.Contains(cwd, "/enterprise/") {
-			targetRepo = filepath.Join(workspaceRoot, "enterprise")
+		mattermostPath, mmErr := internal.ResolveMattermostPath()
+		enterprisePath, entErr := internal.ResolveEnterprisePath()
+
+		if entErr == nil && strings.HasPrefix(cwd, enterprisePath) {
+			targetRepo = enterprisePath
+		} else if mmErr == nil {
+			targetRepo = mattermostPath
 		} else {
-			// At the root of a mattermost worktree, default to mattermost repo
-			targetRepo = filepath.Join(workspaceRoot, "mattermost")
+			return fmt.Errorf("failed to resolve mattermost paths: %v", mmErr)
 		}
 	} else {
 		// Use git worktree list to find the parent repository

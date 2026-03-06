@@ -6,11 +6,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/nickmisasi/wt/internal"
 )
 
 const shellFunctionMarker = "# wt-shell-integration"
 
-const shellFunction = `
+const shellFunctionTemplate = `
 # wt-shell-integration
 wt() {
     local output
@@ -37,14 +39,12 @@ wt() {
     return $exit_code
 }
 
-# Smart cd for worktrees - makes "cd .." from worktree root go to ~/workspace
+# Smart cd for worktrees - makes "cd .." from worktree root go to workspace
 cd() {
-    # Only intercept "cd .." from worktree root
     if [[ "$1" == ".." ]]; then
-        local parent_dir="${PWD%%/*}"  # Get parent directory
-        # Check if parent is ~/workspace/worktrees
-        if [[ "$parent_dir" == "$HOME/workspace/worktrees" ]]; then
-            builtin cd "$HOME/workspace"
+        local parent_dir="${PWD%%/*}"
+        if [[ "$parent_dir" == "%s" ]]; then
+            builtin cd "%s"
             return
         fi
     fi
@@ -146,14 +146,22 @@ func RunInstall() error {
 	}
 
 	if !alreadyInstalled {
-		// Add shell function to .zshrc
+		worktreesPath, err := internal.ResolveWorktreesPath()
+		if err != nil {
+			return fmt.Errorf("failed to resolve worktrees path: %w", err)
+		}
+		workspaceRoot, err := internal.ResolveWorkspaceRoot()
+		if err != nil {
+			return fmt.Errorf("failed to resolve workspace root: %w", err)
+		}
+
 		f, err := os.OpenFile(zshrcPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("failed to open .zshrc: %w", err)
 		}
 		defer f.Close()
 
-		functionCode := fmt.Sprintf(shellFunction, wtPath)
+		functionCode := fmt.Sprintf(shellFunctionTemplate, wtPath, worktreesPath, workspaceRoot)
 		if _, err := f.WriteString("\n" + functionCode); err != nil {
 			return fmt.Errorf("failed to write to .zshrc: %w", err)
 		}
