@@ -114,5 +114,22 @@ func runConfigSet(args []string) error {
 	}
 
 	fmt.Printf("%s = %s\n", internal.NormalizeKey(key), value)
+
+	normalizedKey := internal.NormalizeKey(key)
+	if isPathKey(normalizedKey) {
+		fmt.Println("Note: please re-run 'wt install' to update shell integration.")
+	}
+
 	return nil
+}
+
+var pathKeys = map[string]bool{
+	"workspace.root":             true,
+	"worktrees.path":             true,
+	"mattermost.path":            true,
+	"mattermost.enterprise_path": true,
+}
+
+func isPathKey(key string) bool {
+	return pathKeys[key]
 }

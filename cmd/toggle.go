@@ -4,10 +4,22 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/nickmisasi/wt/internal"
 )
+
+// isUnderDir checks whether child is inside or equal to parent, using a
+// trailing separator to avoid partial-name matches.
+func isUnderDir(child, parent string) bool {
+	c := filepath.Clean(child)
+	p := filepath.Clean(parent)
+	if c == p {
+		return true
+	}
+	return strings.HasPrefix(c, p+string(filepath.Separator))
+}
 
 // RunToggle switches from worktree back to parent repository
 func RunToggle() error {
@@ -22,8 +34,7 @@ func RunToggle() error {
 		return fmt.Errorf("failed to resolve worktrees path: %w", err)
 	}
 
-	// Check if we're in a worktree directory
-	if !strings.HasPrefix(cwd, worktreesDir) {
+	if !isUnderDir(cwd, worktreesDir) {
 		return fmt.Errorf("not currently in a worktree directory")
 	}
 
@@ -35,7 +46,7 @@ func RunToggle() error {
 		mattermostPath, mmErr := internal.ResolveMattermostPath()
 		enterprisePath, entErr := internal.ResolveEnterprisePath()
 
-		if entErr == nil && strings.HasPrefix(cwd, enterprisePath) {
+		if entErr == nil && isUnderDir(cwd, enterprisePath) {
 			targetRepo = enterprisePath
 		} else if mmErr == nil {
 			targetRepo = mattermostPath

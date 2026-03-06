@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/nickmisasi/wt/internal"
@@ -90,11 +91,18 @@ func runMattermostRemove(mc *internal.MattermostConfig, branch string, force boo
 	return nil
 }
 
-// isInsidePath checks if the current working directory is inside the given path.
-func isInsidePath(path string) bool {
+// isInsidePath checks if the current working directory is inside or equal to
+// the given path. It appends a path separator before comparing to avoid false
+// positives on similarly-prefixed directory names.
+func isInsidePath(dir string) bool {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return false
 	}
-	return strings.HasPrefix(cwd, path)
+	cleanCwd := filepath.Clean(cwd)
+	cleanDir := filepath.Clean(dir)
+	if cleanCwd == cleanDir {
+		return true
+	}
+	return strings.HasPrefix(cleanCwd, cleanDir+string(filepath.Separator))
 }

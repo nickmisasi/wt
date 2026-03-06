@@ -31,7 +31,7 @@ OPTIONS:
 
 WORKTREE STORAGE:
     Standard worktrees: <worktrees.path>/<repo-name>-<branch-name>/
-    Default worktrees path: ~/workspace/worktrees (configurable via 'wt config')
+    worktrees.path defaults to <workspace.root>/worktrees (configurable via 'wt config')
 
 MATTERMOST DUAL-REPOSITORY SUPPORT:
     When working in the mattermost repository, wt automatically creates dual-repo
@@ -51,8 +51,8 @@ MATTERMOST DUAL-REPOSITORY SUPPORT:
     - Runs 'make setup-go-work' after creation
 
     Requirements (paths configurable via 'wt config'):
-    - mattermost/mattermost repo  (default: ~/workspace/mattermost)
-    - mattermost/enterprise repo  (default: ~/workspace/enterprise)
+    - mattermost/mattermost repo  (default: <workspace.root>/mattermost)
+    - mattermost/enterprise repo  (default: <workspace.root>/enterprise)
 
 EXAMPLES:
     # Standard repository
