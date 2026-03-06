@@ -126,8 +126,6 @@ func runConfigSet(args []string) error {
 var pathKeys = map[string]bool{
 	"workspace.root":             true,
 	"worktrees.path":             true,
-	"mattermost.path":            true,
-	"mattermost.enterprise_path": true,
 }
 
 func isPathKey(key string) bool {
