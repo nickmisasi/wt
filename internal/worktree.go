@@ -25,6 +25,22 @@ func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
 		return nil, fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
+	// Resolve the base path for symlink-safe comparison (macOS /var -> /private/var)
+	canonicalBase := config.WorktreeBasePath
+	if resolved, err := filepath.EvalSymlinks(canonicalBase); err == nil {
+		canonicalBase = resolved
+	}
+
+	isManaged := func(path string) bool {
+		if strings.HasPrefix(path, config.WorktreeBasePath) {
+			return true
+		}
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			return strings.HasPrefix(resolved, canonicalBase)
+		}
+		return false
+	}
+
 	var worktrees []WorktreeInfo
 	lines := strings.Split(string(output), "\n")
 
@@ -34,7 +50,7 @@ func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
 		if line == "" {
 			if currentWorktree.Path != "" {
 				// Check if this worktree is in our managed directory
-				if strings.HasPrefix(currentWorktree.Path, config.WorktreeBasePath) {
+				if isManaged(currentWorktree.Path) {
 					worktrees = append(worktrees, currentWorktree)
 				}
 				currentWorktree = WorktreeInfo{}
@@ -53,7 +69,7 @@ func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
 	}
 
 	// Don't forget the last one
-	if currentWorktree.Path != "" && strings.HasPrefix(currentWorktree.Path, config.WorktreeBasePath) {
+	if currentWorktree.Path != "" && isManaged(currentWorktree.Path) {
 		worktrees = append(worktrees, currentWorktree)
 	}
 
@@ -94,34 +110,50 @@ func getLastCommitTime(path string) time.Time {
 func CreateWorktree(config *Config, branch string, createBranch bool, baseBranch string) (string, error) {
 	worktreePath := config.GetWorktreePath(branch)
 
+	// Check for sanitized path collisions with a different branch
+	collision, collisionPath, err := FindCollidingWorktree(config, branch)
+	if err != nil {
+		return "", fmt.Errorf("failed to check for worktree collisions: %w", err)
+	}
+	if collision != nil {
+		return "", fmt.Errorf("worktree path collision: branch %q already occupies %s (requested branch %q sanitizes to the same path)", collision.Branch, collisionPath, branch)
+	}
+
 	// Ensure the base directory exists
 	if err := os.MkdirAll(config.WorktreeBasePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create worktree base directory: %w", err)
 	}
 
 	// Create the worktree
-	var cmd *exec.Cmd
+	var gitCmd *exec.Cmd
 	if createBranch {
 		// Create new branch from base branch
 		if baseBranch != "" {
-			cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath, baseBranch)
+			gitCmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath, baseBranch)
 		} else {
-			cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
+			gitCmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
 		}
 	} else {
 		// Use existing branch
-		cmd = exec.Command("git", "worktree", "add", worktreePath, branch)
+		gitCmd = exec.Command("git", "worktree", "add", worktreePath, branch)
 	}
 
-	output, err := cmd.CombinedOutput()
+	output, err := gitCmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to create worktree: %s", string(output))
 	}
 
+	// Set push.autoSetupRemote for the new worktree
+	autoSetupCmd := exec.Command("git", "-C", worktreePath, "config", "--local", "push.autoSetupRemote", "true")
+	_ = autoSetupCmd.Run() // best-effort
+
 	return worktreePath, nil
 }
 
-// WorktreeExists checks if a worktree already exists for the given branch
+// WorktreeExists checks if a worktree already exists for the given branch.
+// It verifies both the path existence and that the branch name matches,
+// to avoid false positives from sanitized path collisions (e.g., feature/foo
+// and feature-foo both map to the same directory).
 func WorktreeExists(config *Config, branch string) (bool, string) {
 	worktreePath := config.GetWorktreePath(branch)
 
@@ -130,14 +162,28 @@ func WorktreeExists(config *Config, branch string) (bool, string) {
 		return false, ""
 	}
 
-	// Verify it's actually a worktree by checking git worktree list
+	// Resolve symlinks for comparison (macOS /var -> /private/var)
+	canonicalTarget, _ := filepath.EvalSymlinks(worktreePath)
+	if canonicalTarget == "" {
+		canonicalTarget = worktreePath
+	}
+
+	// Verify it's actually a worktree for this branch by checking git worktree list
 	worktrees, err := ListWorktrees(config)
 	if err != nil {
 		return false, ""
 	}
 
 	for _, wt := range worktrees {
-		if wt.Path == worktreePath {
+		// Must match both path AND branch name to avoid sanitized-name collisions
+		if wt.Branch != branch {
+			continue
+		}
+		canonicalWt, _ := filepath.EvalSymlinks(wt.Path)
+		if canonicalWt == "" {
+			canonicalWt = wt.Path
+		}
+		if wt.Path == worktreePath || canonicalWt == canonicalTarget {
 			return true, worktreePath
 		}
 	}
@@ -152,6 +198,14 @@ func RemoveWorktree(path string) error {
 
 // RemoveWorktreeWithForce removes a worktree; when force is true it passes -f to git
 func RemoveWorktreeWithForce(path string, force bool) error {
+	// Kill associated claudemux session if it exists (best-effort)
+	if branch := branchFromWorktreePath(path); branch != "" {
+		sessionName := SanitizeBranchForTmux(branch)
+		if HasSession(sessionName) {
+			_ = KillSession(sessionName)
+		}
+	}
+
 	args := []string{"worktree", "remove"}
 	if force {
 		args = append(args, "-f")
@@ -188,4 +242,101 @@ func GetBranchNameFromWorktreePath(config *Config, path string) string {
 
 	// Strip the repo prefix
 	return config.StripRepoPrefix(dirName)
+}
+
+// branchFromWorktreePath uses git worktree list to find the branch for a worktree path.
+func branchFromWorktreePath(path string) string {
+	// Run from the target path itself so git can find the repo
+	cmd := exec.Command("git", "-C", path, "worktree", "list", "--porcelain")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+
+	// Resolve symlinks for comparison (macOS /var -> /private/var)
+	canonicalPath := path
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		canonicalPath = resolved
+	}
+
+	var currentPath string
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			currentPath = strings.TrimPrefix(line, "worktree ")
+		}
+		if strings.HasPrefix(line, "branch ") {
+			match := currentPath == path
+			if !match {
+				if resolved, err := filepath.EvalSymlinks(currentPath); err == nil {
+					match = resolved == canonicalPath
+				}
+			}
+			if match {
+				ref := strings.TrimPrefix(line, "branch ")
+				return strings.TrimPrefix(ref, "refs/heads/")
+			}
+		}
+	}
+	return ""
+}
+
+// FindCollidingWorktree checks if a different branch already occupies the same
+// sanitized worktree path. Returns the existing worktree info, the colliding
+// path, and any error.
+func FindCollidingWorktree(config *Config, branch string) (*WorktreeInfo, string, error) {
+	targetPath := config.GetWorktreePath(branch)
+
+	// Check if directory exists
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return nil, "", nil
+	}
+
+	// Resolve symlinks for comparison (macOS /var -> /private/var)
+	canonicalTarget := targetPath
+	if resolved, err := filepath.EvalSymlinks(targetPath); err == nil {
+		canonicalTarget = resolved
+	}
+
+	pathsMatch := func(a string) bool {
+		if a == targetPath {
+			return true
+		}
+		if resolved, err := filepath.EvalSymlinks(a); err == nil {
+			return resolved == canonicalTarget
+		}
+		return false
+	}
+
+	// The directory exists — find which branch actually occupies it using porcelain output
+	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to list worktrees: %w", err)
+	}
+
+	var currentPath, currentBranch string
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			currentPath = strings.TrimPrefix(line, "worktree ")
+			currentBranch = ""
+		} else if strings.HasPrefix(line, "branch ") {
+			ref := strings.TrimPrefix(line, "branch ")
+			currentBranch = strings.TrimPrefix(ref, "refs/heads/")
+		}
+		if line == "" && pathsMatch(currentPath) && currentBranch != "" && currentBranch != branch {
+			return &WorktreeInfo{
+				Path:   currentPath,
+				Branch: currentBranch,
+			}, targetPath, nil
+		}
+	}
+	// Check the last entry (porcelain output may not end with blank line)
+	if pathsMatch(currentPath) && currentBranch != "" && currentBranch != branch {
+		return &WorktreeInfo{
+			Path:   currentPath,
+			Branch: currentBranch,
+		}, targetPath, nil
+	}
+
+	return nil, "", nil
 }

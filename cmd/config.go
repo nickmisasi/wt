@@ -21,6 +21,9 @@ Available keys:
     worktrees.path              Worktrees directory (default: <workspace.root>/worktrees)
     mattermost.path             Mattermost repo path (default: <workspace.root>/mattermost)
     mattermost.enterprise_path  Enterprise repo path (default: <workspace.root>/enterprise)
+    claudemux.enabled           Enable claudemux sessions on checkout (default: false)
+    claudemux.command           Claude command to run in sessions
+    claudemux.max_sessions      Maximum concurrent sessions (default: 10)
 
     Relative paths resolve from $HOME; absolute paths are used as-is.
     When unset, worktrees/mattermost/enterprise paths derive from workspace.root.

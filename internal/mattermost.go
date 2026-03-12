@@ -615,6 +615,12 @@ func updateConfigPorts(configPath string, serverPort, metricsPort int) error {
 
 // RemoveMattermostDualWorktree removes a Mattermost dual-repo worktree
 func RemoveMattermostDualWorktree(mc *MattermostConfig, branch string, force bool) error {
+	// Kill associated claudemux session (best-effort)
+	sessionName := SanitizeBranchForTmux(branch)
+	if HasSession(sessionName) {
+		_ = KillSession(sessionName)
+	}
+
 	worktreePath := mc.GetMattermostWorktreePath(branch)
 
 	// Check if it exists

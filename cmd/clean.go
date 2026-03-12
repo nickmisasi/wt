@@ -75,6 +75,13 @@ func RunClean(config interface{}) error {
 	removed := 0
 	for _, wt := range staleWorktrees {
 		fmt.Printf("Removing worktree: %s...\n", wt.Branch)
+
+		// Kill associated claudemux session (best-effort)
+		sessionName := internal.SanitizeBranchForTmux(wt.Branch)
+		if internal.HasSession(sessionName) {
+			_ = internal.KillSession(sessionName)
+		}
+
 		err := internal.RemoveWorktree(wt.Path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  ✗ Failed to remove %s: %v\n", wt.Branch, err)

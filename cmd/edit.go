@@ -158,7 +158,7 @@ func runMattermostEdit(repo *internal.GitRepo, branch string, baseBranch string,
 	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
 		// Create it first
 		fmt.Printf("Worktree doesn't exist for branch '%s'. Creating it...\n\n", branch)
-		if err := runMattermostCheckout(repo, branch, baseBranch, 0, 0, noClaudeDocs); err != nil {
+		if err := runMattermostCheckout(repo, branch, baseBranch, 0, 0, noClaudeDocs, nil); err != nil {
 			return err
 		}
 		// Refresh the worktree path
