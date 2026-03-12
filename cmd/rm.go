@@ -10,7 +10,7 @@ import (
 )
 
 // RunRemove removes a worktree for the given branch. When force is true, uses git -f
-func RunRemove(config interface{}, branch string, force bool) error {
+func RunRemove(config interface{}, branch string, force bool, jsonOutput bool) error {
 	cfg, ok := config.(*internal.Config)
 	if !ok {
 		return fmt.Errorf("invalid config type")
@@ -30,14 +30,39 @@ func RunRemove(config interface{}, branch string, force bool) error {
 	}
 
 	// Standard worktree removal
-	return runStandardRemove(cfg, branch, force)
+	return runStandardRemove(cfg, branch, force, jsonOutput)
 }
 
 // runStandardRemove handles standard single-repo worktree removal
-func runStandardRemove(cfg *internal.Config, branch string, force bool) error {
+func runStandardRemove(cfg *internal.Config, branch string, force bool, jsonOutput bool) error {
+	worktreePath := cfg.GetWorktreePath(branch)
+
 	wt, err := internal.GetWorktreeByBranch(cfg, branch)
 	if err != nil {
+		if jsonOutput {
+			return writeJSON(removeJSONResponse{
+				Mode:         "standard",
+				Branch:       branch,
+				Removed:      false,
+				WorktreePath: worktreePath,
+			})
+		}
 		return fmt.Errorf("worktree not found for branch: %s", branch)
+	}
+
+	if jsonOutput {
+		if err := runSilently(true, func() error {
+			return internal.RemoveWorktreeWithForce(wt.Path, force)
+		}); err != nil {
+			return err
+		}
+		return writeJSON(removeJSONResponse{
+			Mode:         "standard",
+			Branch:       branch,
+			Removed:      true,
+			WorktreePath: wt.Path,
+			RemovedPaths: []string{wt.Path},
+		})
 	}
 
 	fmt.Printf("Removing worktree for branch '%s' at %s\n", wt.Branch, wt.Path)

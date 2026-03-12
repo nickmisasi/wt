@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -361,5 +362,205 @@ func TestSaveAndLoadRoundTripWithSpaces(t *testing.T) {
 
 	if loaded.Editor.Command != "code --wait" {
 		t.Errorf("round-trip: expected 'code --wait', got %q", loaded.Editor.Command)
+	}
+}
+
+func TestClaudemuxConfigDefaults(t *testing.T) {
+	cfg := DefaultUserConfig()
+	if cfg.Claudemux.Enabled {
+		t.Error("expected claudemux.enabled to default to false")
+	}
+	if cfg.Claudemux.Command == "" {
+		t.Error("expected claudemux.command to have a default value")
+	}
+	if cfg.Claudemux.MaxSessions != 10 {
+		t.Errorf("expected claudemux.max_sessions to default to 10, got %d", cfg.Claudemux.MaxSessions)
+	}
+}
+
+func TestGetSetClaudemuxEnabled(t *testing.T) {
+	cfg := DefaultUserConfig()
+
+	if err := cfg.SetConfigValue("claudemux.enabled", "true"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, err := cfg.GetConfigValue("claudemux.enabled")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "true" {
+		t.Errorf("expected 'true', got %q", val)
+	}
+
+	// Also test "1" as truthy
+	if err := cfg.SetConfigValue("claudemux.enabled", "1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Claudemux.Enabled {
+		t.Error("expected '1' to set enabled to true")
+	}
+
+	// Test false
+	if err := cfg.SetConfigValue("claudemux.enabled", "false"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Claudemux.Enabled {
+		t.Error("expected 'false' to set enabled to false")
+	}
+}
+
+func TestGetSetClaudemuxCommand(t *testing.T) {
+	cfg := DefaultUserConfig()
+
+	if err := cfg.SetConfigValue("claudemux.command", "claude --resume"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, err := cfg.GetConfigValue("claudemux.command")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "claude --resume" {
+		t.Errorf("expected 'claude --resume', got %q", val)
+	}
+}
+
+func TestGetSetClaudemuxMaxSessions(t *testing.T) {
+	cfg := DefaultUserConfig()
+
+	if err := cfg.SetConfigValue("claudemux.max_sessions", "5"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, err := cfg.GetConfigValue("claudemux.max_sessions")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "5" {
+		t.Errorf("expected '5', got %q", val)
+	}
+
+	// Non-integer should fail
+	if err := cfg.SetConfigValue("claudemux.max_sessions", "abc"); err == nil {
+		t.Error("expected error for non-integer max_sessions")
+	}
+
+	// Zero/negative should fail
+	if err := cfg.SetConfigValue("claudemux.max_sessions", "0"); err == nil {
+		t.Error("expected error for zero max_sessions")
+	}
+	if err := cfg.SetConfigValue("claudemux.max_sessions", "-1"); err == nil {
+		t.Error("expected error for negative max_sessions")
+	}
+}
+
+func TestSetConfigValue_MaxSessionsValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "positive integer succeeds",
+			value:   "5",
+			wantErr: false,
+		},
+		{
+			name:    "one succeeds",
+			value:   "1",
+			wantErr: false,
+		},
+		{
+			name:    "zero rejected",
+			value:   "0",
+			wantErr: true,
+			errMsg:  "positive integer",
+		},
+		{
+			name:    "negative rejected",
+			value:   "-3",
+			wantErr: true,
+			errMsg:  "positive integer",
+		},
+		{
+			name:    "non-integer rejected",
+			value:   "abc",
+			wantErr: true,
+			errMsg:  "positive integer",
+		},
+		{
+			name:    "float rejected",
+			value:   "3.5",
+			wantErr: true,
+			errMsg:  "positive integer",
+		},
+		{
+			name:    "large value succeeds",
+			value:   "100",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultUserConfig()
+			err := cfg.SetConfigValue("claudemux.max_sessions", tt.value)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error for value %q, got nil", tt.value)
+				} else if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.errMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error for value %q: %v", tt.value, err)
+				}
+			}
+		})
+	}
+}
+
+func TestClaudemuxKeysAreValid(t *testing.T) {
+	keys := []string{"claudemux.enabled", "claudemux.command", "claudemux.max_sessions"}
+	for _, key := range keys {
+		if !IsValidKey(key) {
+			t.Errorf("expected %q to be a valid key", key)
+		}
+	}
+}
+
+func TestClaudemuxConfigRoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "wt", "config.json")
+
+	cfg := DefaultUserConfig()
+	cfg.Claudemux.Enabled = true
+	cfg.Claudemux.Command = "claude --resume"
+	cfg.Claudemux.MaxSessions = 5
+
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+
+	data, err := marshalConfig(&cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		t.Fatalf("failed to write: %v", err)
+	}
+
+	loaded, err := loadConfigFromPath(configPath)
+	if err != nil {
+		t.Fatalf("failed to load: %v", err)
+	}
+
+	if !loaded.Claudemux.Enabled {
+		t.Error("round-trip: expected claudemux.enabled to be true")
+	}
+	if loaded.Claudemux.Command != "claude --resume" {
+		t.Errorf("round-trip: expected command 'claude --resume', got %q", loaded.Claudemux.Command)
+	}
+	if loaded.Claudemux.MaxSessions != 5 {
+		t.Errorf("round-trip: expected max_sessions 5, got %d", loaded.Claudemux.MaxSessions)
 	}
 }

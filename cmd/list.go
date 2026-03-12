@@ -8,7 +8,7 @@ import (
 )
 
 // RunList lists all worktrees for the current repository
-func RunList(config interface{}, showHeader bool) error {
+func RunList(config interface{}, showHeader bool, jsonOutput bool) error {
 	cfg, ok := config.(*internal.Config)
 	if !ok {
 		return fmt.Errorf("invalid config type")
@@ -17,6 +17,19 @@ func RunList(config interface{}, showHeader bool) error {
 	worktrees, err := internal.ListWorktrees(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to list worktrees: %w", err)
+	}
+
+	if jsonOutput {
+		items := make([]listJSONItem, 0, len(worktrees))
+		for _, wt := range worktrees {
+			items = append(items, listJSONItem{
+				Branch:         wt.Branch,
+				Path:           wt.Path,
+				IsDirty:        wt.IsDirty,
+				LastCommitUnix: wt.LastCommit.Unix(),
+			})
+		}
+		return writeJSON(items)
 	}
 
 	if len(worktrees) == 0 {
@@ -59,4 +72,3 @@ func repeat(s string, n int) string {
 	}
 	return result
 }
-

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -30,12 +31,20 @@ type MattermostPathsConfig struct {
 	EnterprisePath string `json:"enterprise_path"`
 }
 
+// ClaudemuxConfig holds settings for tmux-managed Claude sessions.
+type ClaudemuxConfig struct {
+	Enabled     bool   `json:"enabled"`
+	Command     string `json:"command"`
+	MaxSessions int    `json:"max_sessions"`
+}
+
 // UserConfig holds user-facing persistent settings (distinct from the runtime Config).
 type UserConfig struct {
-	Editor    EditorConfig          `json:"editor"`
-	Workspace WorkspaceConfig      `json:"workspace"`
-	Worktrees WorktreesConfig      `json:"worktrees"`
+	Editor     EditorConfig          `json:"editor"`
+	Workspace  WorkspaceConfig       `json:"workspace"`
+	Worktrees  WorktreesConfig       `json:"worktrees"`
 	Mattermost MattermostPathsConfig `json:"mattermost"`
+	Claudemux  ClaudemuxConfig       `json:"claudemux"`
 }
 
 // DefaultUserConfig returns a UserConfig populated with default values.
@@ -46,6 +55,11 @@ func DefaultUserConfig() UserConfig {
 		},
 		Workspace: WorkspaceConfig{
 			Root: "workspace",
+		},
+		Claudemux: ClaudemuxConfig{
+			Enabled:     false,
+			Command:     "claude --continue --dangerously-skip-permissions",
+			MaxSessions: 10,
 		},
 	}
 }
@@ -58,6 +72,9 @@ func validKeys() map[string]bool {
 		"worktrees.path":              true,
 		"mattermost.path":             true,
 		"mattermost.enterprise_path":  true,
+		"claudemux.enabled":           true,
+		"claudemux.command":           true,
+		"claudemux.max_sessions":      true,
 	}
 }
 
@@ -154,6 +171,12 @@ func (c *UserConfig) GetConfigValue(key string) (string, error) {
 		return c.Mattermost.Path, nil
 	case "mattermost.enterprise_path":
 		return c.Mattermost.EnterprisePath, nil
+	case "claudemux.enabled":
+		return fmt.Sprintf("%t", c.Claudemux.Enabled), nil
+	case "claudemux.command":
+		return c.Claudemux.Command, nil
+	case "claudemux.max_sessions":
+		return fmt.Sprintf("%d", c.Claudemux.MaxSessions), nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s (valid keys: %s)", key, strings.Join(ValidKeyNames(), ", "))
 	}
@@ -176,6 +199,22 @@ func (c *UserConfig) SetConfigValue(key, value string) error {
 		return nil
 	case "mattermost.enterprise_path":
 		c.Mattermost.EnterprisePath = value
+		return nil
+	case "claudemux.enabled":
+		c.Claudemux.Enabled = value == "true" || value == "1"
+		return nil
+	case "claudemux.command":
+		c.Claudemux.Command = value
+		return nil
+	case "claudemux.max_sessions":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("max_sessions must be a positive integer: %w", err)
+		}
+		if n <= 0 {
+			return fmt.Errorf("max_sessions must be a positive integer, got %d", n)
+		}
+		c.Claudemux.MaxSessions = n
 		return nil
 	default:
 		return fmt.Errorf("unknown config key: %s (valid keys: %s)", key, strings.Join(ValidKeyNames(), ", "))

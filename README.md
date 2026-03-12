@@ -12,6 +12,7 @@ A powerful CLI tool to manage Git worktrees across multiple repositories, design
 - ⚡ **Smart Completions**: Zsh auto-completions that prioritize existing worktrees
 - 🧭 **Smart Navigation**: `cd ..` from worktree root takes you to ~/workspace
 - 🔗 **Mattermost Dual-Repo**: Special support for Mattermost's dual-repository workflow
+- 🤖 **Claudemux**: Persistent Claude Code sessions via tmux, accessible from claude.ai/code and mobile
 
 ## Installation
 
@@ -312,6 +313,68 @@ wt cursor ai-<TAB>
 
 This makes it fast to switch between your active worktrees without typing full branch names.
 
+## Claudemux (Persistent Claude Sessions)
+
+Claudemux creates detached tmux sessions running Claude Code alongside your worktrees. Sessions persist across terminal restarts and are accessible from [claude.ai/code](https://claude.ai/code) and the Claude mobile app via remote control.
+
+### Quick Start
+
+```bash
+# Enable claudemux globally
+wt config set claudemux.enabled true
+
+# Now every wt co creates a Claude session alongside the worktree
+wt co feature-123
+# Creates worktree + detached tmux session running claude --continue
+
+# Check your sessions
+wt sessions
+```
+
+### Per-Checkout Override
+
+```bash
+# Force session creation even if globally disabled
+wt co my-branch --claudemux
+
+# Skip session creation even if globally enabled
+wt co my-branch --no-claudemux
+```
+
+### Session Management
+
+```bash
+wt sessions                  # List all managed sessions with status
+wt sessions health           # Check sessions and auto-respawn dead ones
+wt sessions start            # Create sessions for all worktrees missing one
+wt sessions stop             # Kill all managed sessions
+wt sessions restart          # Stop all, then start fresh
+```
+
+Sessions are named `wt-<sanitized-branch>` (e.g., `wt-feature-auth` for `feature/auth`). They auto-cleanup when you run `wt rm` or `wt clean`.
+
+### Crash Recovery
+
+Sessions use tmux's `remain-on-exit` and `pane-died` hooks to automatically respawn if Claude crashes. You can also manually check with `wt sessions health`.
+
+### Configuration
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `claudemux.enabled` | `false` | Enable session creation on `wt co` |
+| `claudemux.command` | `claude --continue --dangerously-skip-permissions` | Command to run in tmux session |
+| `claudemux.max_sessions` | `10` | Maximum concurrent sessions (oldest evicted at cap) |
+
+```bash
+wt config set claudemux.enabled true
+wt config set claudemux.max_sessions 15
+```
+
+### Requirements
+
+- **tmux** must be installed (`brew install tmux`)
+- **claude** CLI must be installed and on PATH
+
 ## Mattermost Dual-Repository Workflow
 
 For developers working on Mattermost, `wt` **automatically detects** when you're in the mattermost repository and creates dual-repo worktrees using the standard commands - no special commands needed!
@@ -455,6 +518,8 @@ wt rm MM-12345
 - Git 2.5+ (for worktree support)
 - Zsh (for shell integration)
 - Cursor CLI (optional, for `wt cursor` command)
+- tmux (optional, for claudemux persistent sessions)
+- Claude CLI (optional, for claudemux)
 
 ## Contributing
 
