@@ -24,34 +24,40 @@ func RunCheckout(cfg *internal.Config, repo *internal.GitRepo, branch string, ba
 
 // ensureBranchAndCreateWorktree checks if a branch exists (locally or remotely),
 // creates a tracking branch if needed, and creates a worktree for it.
+// When baseBranch is explicitly provided, it always creates the branch from that
+// base, using -B to reset the branch if it already exists.
 func ensureBranchAndCreateWorktree(cfg *internal.Config, repo *internal.GitRepo, branch string, baseBranch string) (string, error) {
-	branchExists, err := repo.BranchExists(branch)
-	if err != nil {
-		return "", fmt.Errorf("failed to check if branch exists: %w", err)
-	}
+	forceCreate := false
 
-	createNewBranch := false
-	if !branchExists {
-		remoteBranchExists, err := repo.RemoteBranchExists(branch)
+	if baseBranch != "" {
+		fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
+		forceCreate = true
+	} else {
+		branchExists, err := repo.BranchExists(branch)
 		if err != nil {
-			return "", fmt.Errorf("failed to check remote branches: %w", err)
+			return "", fmt.Errorf("failed to check if branch exists: %w", err)
 		}
 
-		if remoteBranchExists {
-			fmt.Printf("Creating local branch '%s' tracking 'origin/%s'...\n", branch, branch)
-			if err := repo.CreateTrackingBranch(branch); err != nil {
-				return "", fmt.Errorf("failed to create tracking branch: %w", err)
+		if !branchExists {
+			remoteBranchExists, err := repo.RemoteBranchExists(branch)
+			if err != nil {
+				return "", fmt.Errorf("failed to check remote branches: %w", err)
 			}
-		} else {
-			if baseBranch == "" {
+
+			if remoteBranchExists {
+				fmt.Printf("Creating local branch '%s' tracking 'origin/%s'...\n", branch, branch)
+				if err := repo.CreateTrackingBranch(branch); err != nil {
+					return "", fmt.Errorf("failed to create tracking branch: %w", err)
+				}
+			} else {
 				baseBranch = repo.GetDefaultBranch()
+				fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
 			}
-			fmt.Printf("Creating new branch '%s' from '%s'\n", branch, baseBranch)
-			createNewBranch = true
 		}
 	}
 
-	path, err := internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch)
+	createNewBranch := baseBranch != ""
+	path, err := internal.CreateWorktree(cfg, branch, createNewBranch, baseBranch, forceCreate)
 	if err != nil {
 		return "", fmt.Errorf("failed to create worktree: %w", err)
 	}

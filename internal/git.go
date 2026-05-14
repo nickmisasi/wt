@@ -78,7 +78,7 @@ func getRepoNameFromRemote() (string, error) {
 
 // BranchExists checks if a branch exists locally
 func (g *GitRepo) BranchExists(branch string) (bool, error) {
-	cmd := exec.Command("git", "branch", "--list", branch)
+	cmd := exec.Command("git", "-C", g.Root, "branch", "--list", branch)
 	output, err := cmd.Output()
 	if err != nil {
 		return false, err
@@ -88,7 +88,7 @@ func (g *GitRepo) BranchExists(branch string) (bool, error) {
 
 // RemoteBranchExists checks if a branch exists on the remote
 func (g *GitRepo) RemoteBranchExists(branch string) (bool, error) {
-	cmd := exec.Command("git", "branch", "-r", "--list", "origin/"+branch)
+	cmd := exec.Command("git", "-C", g.Root, "branch", "-r", "--list", "origin/"+branch)
 	output, err := cmd.Output()
 	if err != nil {
 		return false, err
@@ -98,7 +98,7 @@ func (g *GitRepo) RemoteBranchExists(branch string) (bool, error) {
 
 // CreateTrackingBranch creates a local branch tracking a remote branch
 func (g *GitRepo) CreateTrackingBranch(branch string) error {
-	cmd := exec.Command("git", "branch", "--track", branch, "origin/"+branch)
+	cmd := exec.Command("git", "-C", g.Root, "branch", "--track", branch, "origin/"+branch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create tracking branch: %s", string(output))
@@ -108,7 +108,7 @@ func (g *GitRepo) CreateTrackingBranch(branch string) error {
 
 // ListBranches returns all local branches
 func (g *GitRepo) ListBranches() ([]string, error) {
-	cmd := exec.Command("git", "branch", "--format=%(refname:short)")
+	cmd := exec.Command("git", "-C", g.Root, "branch", "--format=%(refname:short)")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (g *GitRepo) ListBranches() ([]string, error) {
 
 // ListRemoteBranches returns all remote branches (without origin/ prefix)
 func (g *GitRepo) ListRemoteBranches() ([]string, error) {
-	cmd := exec.Command("git", "branch", "-r", "--format=%(refname:short)")
+	cmd := exec.Command("git", "-C", g.Root, "branch", "-r", "--format=%(refname:short)")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (g *GitRepo) ListRemoteBranches() ([]string, error) {
 // GetDefaultBranch returns the default branch (main, master, or current branch)
 func (g *GitRepo) GetDefaultBranch() string {
 	// Try to get the default branch from remote
-	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd := exec.Command("git", "-C", g.Root, "symbolic-ref", "refs/remotes/origin/HEAD")
 	output, err := cmd.Output()
 	if err == nil {
 		branch := strings.TrimSpace(string(output))
@@ -170,7 +170,7 @@ func (g *GitRepo) GetDefaultBranch() string {
 	}
 
 	// Last resort: get current branch
-	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd = exec.Command("git", "-C", g.Root, "rev-parse", "--abbrev-ref", "HEAD")
 	output, err = cmd.Output()
 	if err == nil {
 		branch := strings.TrimSpace(string(output))

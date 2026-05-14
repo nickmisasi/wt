@@ -19,7 +19,7 @@ type WorktreeInfo struct {
 
 // ListWorktrees returns all worktrees for the current repository
 func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+	cmd := exec.Command("git", "-C", config.RepoRoot, "worktree", "list", "--porcelain")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list worktrees: %w", err)
@@ -90,27 +90,29 @@ func getLastCommitTime(path string) time.Time {
 	return time.Unix(unixTime, 0)
 }
 
-// CreateWorktree creates a new worktree for the given branch
-func CreateWorktree(config *Config, branch string, createBranch bool, baseBranch string) (string, error) {
+// CreateWorktree creates a new worktree for the given branch.
+// When forceCreate is true and createBranch is true, uses -B instead of -b
+// to reset the branch to baseBranch if it already exists.
+func CreateWorktree(config *Config, branch string, createBranch bool, baseBranch string, forceCreate bool) (string, error) {
 	worktreePath := config.GetWorktreePath(branch)
 
-	// Ensure the base directory exists
 	if err := os.MkdirAll(config.WorktreeBasePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create worktree base directory: %w", err)
 	}
 
-	// Create the worktree
 	var cmd *exec.Cmd
 	if createBranch {
-		// Create new branch from base branch
+		branchFlag := "-b"
+		if forceCreate {
+			branchFlag = "-B"
+		}
 		if baseBranch != "" {
-			cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath, baseBranch)
+			cmd = exec.Command("git", "-C", config.RepoRoot, "worktree", "add", branchFlag, branch, worktreePath, baseBranch)
 		} else {
-			cmd = exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
+			cmd = exec.Command("git", "-C", config.RepoRoot, "worktree", "add", branchFlag, branch, worktreePath)
 		}
 	} else {
-		// Use existing branch
-		cmd = exec.Command("git", "worktree", "add", worktreePath, branch)
+		cmd = exec.Command("git", "-C", config.RepoRoot, "worktree", "add", worktreePath, branch)
 	}
 
 	output, err := cmd.CombinedOutput()
@@ -121,23 +123,45 @@ func CreateWorktree(config *Config, branch string, createBranch bool, baseBranch
 	return worktreePath, nil
 }
 
+// listWorktreePaths returns just the paths of managed worktrees without
+// computing expensive metadata (dirty status, last commit).
+func listWorktreePaths(config *Config) ([]string, error) {
+	cmd := exec.Command("git", "-C", config.RepoRoot, "worktree", "list", "--porcelain")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list worktrees: %w", err)
+	}
+
+	base := filepath.Clean(config.WorktreeBasePath)
+	var paths []string
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "worktree ") {
+			path := strings.TrimPrefix(line, "worktree ")
+			rel, err := filepath.Rel(base, filepath.Clean(path))
+			if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				paths = append(paths, path)
+			}
+		}
+	}
+	return paths, nil
+}
+
 // WorktreeExists checks if a worktree already exists for the given branch
 func WorktreeExists(config *Config, branch string) (bool, string) {
 	worktreePath := config.GetWorktreePath(branch)
 
-	// Check if directory exists
 	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
 		return false, ""
 	}
 
-	// Verify it's actually a worktree by checking git worktree list
-	worktrees, err := ListWorktrees(config)
+	paths, err := listWorktreePaths(config)
 	if err != nil {
 		return false, ""
 	}
 
-	for _, wt := range worktrees {
-		if wt.Path == worktreePath {
+	for _, p := range paths {
+		if p == worktreePath {
 			return true, worktreePath
 		}
 	}
