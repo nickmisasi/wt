@@ -1,0 +1,64 @@
+#compdef wt
+
+_wt() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :->command' \
+        '*::arg:->args'
+
+    case $state in
+        command)
+            _values 'wt command' \
+                'ls[List worktrees]' \
+                'co[Checkout/create worktree]' \
+                'rm[Remove a worktree]' \
+                'clean[Remove stale worktrees]' \
+                'cursor[Open Cursor editor]' \
+                'edit[Open configured editor]' \
+                'config[Manage configuration]' \
+                'install[Install shell integration]' \
+                'help[Show help]'
+            ;;
+        args)
+            case $line[1] in
+                co|cursor|edit)
+                    _arguments \
+                        '1:branch:_wt_complete_branches' \
+                        '-b[Base branch]:base branch:_wt_complete_branches' \
+                        '--base[Base branch]:base branch:_wt_complete_branches' \
+                        '-n[Skip running enable-claude-docs.sh]' \
+                        '--no-claude-docs[Skip running enable-claude-docs.sh]'
+                    ;;
+                rm)
+                    _arguments \
+                        '1:branch:_wt_complete_branches' \
+                        '-f[Force removal]' \
+                        '--force[Force removal]'
+                    ;;
+                config)
+                    _arguments \
+                        '1:subcommand:(get set show)'
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_wt_complete_branches() {
+    local -a branches
+    branches=()
+
+    branches+=(${(f)"$(
+        {
+          git branch --format='%(refname:short)';
+          git branch -r --format='%(refname:short)';
+        } 2>/dev/null |
+        sed -e 's|^origin/||' -e 's|^remotes/origin/||' -e 's|^remotes/||' |
+        grep -v '^HEAD$' |
+        sort -u
+    )"})
+
+    _describe -t branches 'branch' branches
+}

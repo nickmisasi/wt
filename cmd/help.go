@@ -21,7 +21,7 @@ COMMANDS:
     port                         Show current worktree's mapped ports
     t, toggle                    Return to parent repository from worktree
     config                       Manage configuration (get/set/show)
-    install                      Install shell integration and completions
+    install [--shell fish|zsh]     Install shell integration and completions
     help                         Show this help message
 
 OPTIONS:
@@ -88,7 +88,13 @@ CONFIGURATION:
 
 INSTALLATION:
     After building, run 'wt install' to set up shell integration and completions.
-    This adds a shell function to ~/.zshrc that enables automatic directory switching.
+    The install target is auto-detected from $SHELL (fish or zsh). Override with:
+        wt install --shell fish
+        wt install --shell zsh
+
+    Zsh: adds a shell function to ~/.zshrc and installs completions to $fpath.
+    Fish: adds functions to "$HOME/.config/fish/functions/" and completions to
+          "$HOME/.config/fish/completions/".
 `
 
 // RunHelp displays the help text
