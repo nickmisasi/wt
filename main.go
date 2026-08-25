@@ -68,7 +68,8 @@ func run() error {
 		return cmd.RunRemove(config, branch, force)
 
 	case "clean":
-		return cmd.RunClean(config)
+		days, batch, dirty, yes := parseCleanArgs(args[1:])
+		return cmd.RunClean(config, days, batch, dirty, !yes)
 
 	case "cursor":
 		if len(args) < 2 {
@@ -133,4 +134,33 @@ func parseRemoveArgs(args []string) (branch string, force bool) {
 		}
 	}
 	return branch, force
+}
+
+// parseCleanArgs parses optional --days N, --batch N, --dirty, and --yes/-y flags
+func parseCleanArgs(args []string) (days int, batch int, dirty bool, yes bool) {
+	days = cmd.DefaultStaleDays
+	batch = cmd.DefaultCleanBatch
+	dirty = false
+	yes = false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if (a == "-d" || a == "--days") && i+1 < len(args) {
+			i++
+			fmt.Sscanf(args[i], "%d", &days)
+			if days <= 0 {
+				days = cmd.DefaultStaleDays
+			}
+		} else if a == "--batch" && i+1 < len(args) {
+			i++
+			fmt.Sscanf(args[i], "%d", &batch)
+			if batch <= 0 {
+				batch = cmd.DefaultCleanBatch
+			}
+		} else if a == "--dirty" {
+			dirty = true
+		} else if a == "-y" || a == "--yes" {
+			yes = true
+		}
+	}
+	return days, batch, dirty, yes
 }

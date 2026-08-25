@@ -10,16 +10,22 @@ import (
 	"github.com/nickmisasi/wt/internal"
 )
 
-const staleDays = 30
+const (
+	DefaultStaleDays    = 30
+	DefaultCleanBatch   = 10
+	defaultCleanWorkers = 10
+)
 
-// RunClean removes stale worktrees (clean and older than 30 days)
-func RunClean(config interface{}) error {
+// RunClean removes stale worktrees (clean and older than threshold days).
+// Processes in batches for responsiveness on large worktree counts.
+// When confirm is false, skips interactive prompt (for programmatic use).
+func RunClean(config interface{}, days int, batchSize int, includeDirty bool, confirm bool) error {
 	cfg, ok := config.(*internal.Config)
 	if !ok {
 		return fmt.Errorf("invalid config type")
 	}
 
-	worktrees, err := internal.ListWorktrees(cfg)
+	worktrees, err := internal.ListWorktreePaths(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to list worktrees: %w", err)
 	}
@@ -29,62 +35,56 @@ func RunClean(config interface{}) error {
 		return nil
 	}
 
-	// Find worktrees that qualify for removal
-	var staleWorktrees []internal.WorktreeInfo
-	for _, wt := range worktrees {
-		// Skip if it has uncommitted changes
-		if wt.IsDirty {
-			continue
-		}
+	fmt.Printf("Scanning %d worktrees (removing clean worktrees older than %d days)...\n\n", len(worktrees), days)
 
-		// Check if last commit is older than staleDays
-		daysSince := int(time.Since(wt.LastCommit).Hours() / 24)
-		if daysSince >= staleDays {
-			staleWorktrees = append(staleWorktrees, wt)
-		}
-	}
-
-	if len(staleWorktrees) == 0 {
-		fmt.Println("No stale worktrees found (clean and >30 days old).")
-		return nil
-	}
-
-	// Display worktrees that will be removed
-	fmt.Printf("Found %d stale worktree(s) to remove:\n\n", len(staleWorktrees))
-	for _, wt := range staleWorktrees {
-		daysSince := int(time.Since(wt.LastCommit).Hours() / 24)
-		fmt.Printf("  • %s (last commit: %d days ago)\n", wt.Branch, daysSince)
-	}
-
-	// Ask for confirmation
-	fmt.Print("\nDo you want to remove these worktrees? [y/N]: ")
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response != "y" && response != "yes" {
-		fmt.Println("Aborted.")
-		return nil
-	}
-
-	// Remove the worktrees
-	fmt.Println()
-	removed := 0
-	for _, wt := range staleWorktrees {
-		fmt.Printf("Removing worktree: %s...\n", wt.Branch)
-		err := internal.RemoveWorktree(wt.Path)
+	if confirm {
+		fmt.Print("Proceed? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "  ✗ Failed to remove %s: %v\n", wt.Branch, err)
-		} else {
-			fmt.Printf("  ✓ Removed %s\n", wt.Branch)
-			removed++
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		if r := strings.TrimSpace(strings.ToLower(response)); r != "y" && r != "yes" {
+			fmt.Println("Aborted.")
+			return nil
+		}
+		fmt.Println()
+	}
+
+	totalRemoved := 0
+	totalSkipped := 0
+
+	for i := 0; i < len(worktrees); i += batchSize {
+		end := i + batchSize
+		if end > len(worktrees) {
+			end = len(worktrees)
+		}
+		batch := worktrees[i:end]
+
+		internal.FillWorktreeStatus(batch, defaultCleanWorkers)
+
+		for j := range batch {
+			wt := &batch[j]
+			daysSince := int(time.Since(wt.LastCommit).Hours() / 24)
+
+			if (!includeDirty && wt.IsDirty) || daysSince < days {
+				totalSkipped++
+				continue
+			}
+
+			fmt.Printf("  Removing %s (%d days old)...", wt.Branch, daysSince)
+			if err := internal.RemoveWorktree(wt.Path); err != nil {
+				internal.FixWorktreePermissions(wt.Path)
+				if err := internal.RemoveWorktreeWithForce(wt.Path, true); err != nil {
+					fmt.Fprintf(os.Stderr, " FAILED: %v\n", err)
+					continue
+				}
+			}
+			fmt.Println(" done")
+			totalRemoved++
 		}
 	}
 
-	fmt.Printf("\nRemoved %d worktree(s).\n", removed)
+	fmt.Printf("\nDone. Removed %d, skipped %d (dirty or recent).\n", totalRemoved, totalSkipped)
 	return nil
 }
-

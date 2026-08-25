@@ -15,7 +15,7 @@ COMMANDS:
     ls                           List all worktrees for current repository
     co <branch> [-b <base>] [-n] Checkout/create worktree for branch and switch to it
     rm <branch> [-f]             Remove a worktree for branch (use -f to force)
-    clean                        Remove stale worktrees (clean, >30 days old)
+    clean [-d N] [--batch N] [--dirty] [-y]  Remove stale worktrees (>N days old, default 30)
     edit [<branch>] [-b <base>] [-n] Open configured editor (current worktree if no branch)
     cursor                           (deprecated) Alias for 'edit'
     port                         Show current worktree's mapped ports
@@ -28,6 +28,10 @@ OPTIONS:
     -b, --base <branch>         Base branch for new branches (defaults to main/master)
     -f, --force                 Force removal when using 'wt rm'
     -n, --no-claude-docs        Skip running enable-claude-docs.sh after worktree creation
+    -d, --days <N>              Days threshold for 'wt clean' (default: 30)
+    --batch <N>                 Batch size for 'wt clean' (default: 10)
+    --dirty                     Also remove dirty worktrees for 'wt clean'
+    -y, --yes                   Skip confirmation prompt for 'wt clean'
 
 WORKTREE STORAGE:
     Standard worktrees: <worktrees.path>/<repo-name>-<branch-name>/
