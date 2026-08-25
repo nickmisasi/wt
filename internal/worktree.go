@@ -17,8 +17,8 @@ type WorktreeInfo struct {
 	LastCommit time.Time
 }
 
-// ListWorktrees returns all worktrees for the current repository
-func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
+// ListWorktreePaths returns all managed worktrees with only Path and Branch filled (no git status checks).
+func ListWorktreePaths(config *Config) ([]WorktreeInfo, error) {
 	cmd := exec.Command("git", "worktree", "list", "--porcelain")
 	output, err := cmd.Output()
 	if err != nil {
@@ -33,7 +33,6 @@ func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			if currentWorktree.Path != "" {
-				// Check if this worktree is in our managed directory
 				if strings.HasPrefix(currentWorktree.Path, config.WorktreeBasePath) {
 					worktrees = append(worktrees, currentWorktree)
 				}
@@ -46,23 +45,61 @@ func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
 			currentWorktree.Path = strings.TrimPrefix(line, "worktree ")
 		} else if strings.HasPrefix(line, "branch ") {
 			branch := strings.TrimPrefix(line, "branch ")
-			// Remove refs/heads/ prefix
 			branch = strings.TrimPrefix(branch, "refs/heads/")
 			currentWorktree.Branch = branch
 		}
 	}
 
-	// Don't forget the last one
 	if currentWorktree.Path != "" && strings.HasPrefix(currentWorktree.Path, config.WorktreeBasePath) {
 		worktrees = append(worktrees, currentWorktree)
 	}
 
-	// Check dirty status and last commit for each worktree
-	for i := range worktrees {
-		worktrees[i].IsDirty = isWorktreeDirty(worktrees[i].Path)
-		worktrees[i].LastCommit = getLastCommitTime(worktrees[i].Path)
+	return worktrees, nil
+}
+
+// FillWorktreeStatus fills IsDirty and LastCommit for the given worktrees in parallel,
+// limited to maxWorkers concurrent git operations.
+func FillWorktreeStatus(worktrees []WorktreeInfo, maxWorkers int) {
+	if len(worktrees) == 0 {
+		return
 	}
 
+	type result struct {
+		index      int
+		isDirty    bool
+		lastCommit time.Time
+	}
+
+	sem := make(chan struct{}, maxWorkers)
+	results := make(chan result, len(worktrees))
+
+	for i, wt := range worktrees {
+		go func(idx int, path string) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results <- result{
+				index:      idx,
+				isDirty:    isWorktreeDirty(path),
+				lastCommit: getLastCommitTime(path),
+			}
+		}(i, wt.Path)
+	}
+
+	for range worktrees {
+		r := <-results
+		worktrees[r.index].IsDirty = r.isDirty
+		worktrees[r.index].LastCommit = r.lastCommit
+	}
+}
+
+// ListWorktrees returns all worktrees with status info (parallel, bounded concurrency).
+func ListWorktrees(config *Config) ([]WorktreeInfo, error) {
+	worktrees, err := ListWorktreePaths(config)
+	if err != nil {
+		return nil, err
+	}
+
+	FillWorktreeStatus(worktrees, 10)
 	return worktrees, nil
 }
 
@@ -163,6 +200,21 @@ func RemoveWorktreeWithForce(path string, force bool) error {
 		return fmt.Errorf("failed to remove worktree: %s", string(output))
 	}
 	return nil
+}
+
+// FixWorktreePermissions makes all files and directories in the worktree writable
+// so that git worktree remove can delete them.
+func FixWorktreePermissions(path string) {
+	filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		mode := info.Mode()
+		if mode&0200 == 0 {
+			os.Chmod(p, mode|0200)
+		}
+		return nil
+	})
 }
 
 // GetWorktreeByBranch finds a worktree by branch name
