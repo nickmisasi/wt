@@ -18,7 +18,7 @@ COMMANDS:
     clean                        Remove stale worktrees (clean, >30 days old)
     edit [<branch>] [-b <base>] [-n] Open configured editor (current worktree if no branch)
     cursor                           (deprecated) Alias for 'edit'
-    port                         Show current worktree's mapped ports
+    port [--all]                 Show current worktree's mapped ports (--all for every worktree)
     t, toggle                    Return to parent repository from worktree
     config                       Manage configuration (get/set/show)
     install                      Install shell integration and completions

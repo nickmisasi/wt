@@ -88,7 +88,7 @@ func run() error {
 		return cmd.RunToggle()
 
 	case "port":
-		return cmd.RunPort(config, gitRepo)
+		return cmd.RunPort(config, gitRepo, parsePortArgs(args[1:]))
 
 	default:
 		return fmt.Errorf("unknown command: %s\nRun 'wt help' for usage information", args[0])
@@ -133,4 +133,14 @@ func parseRemoveArgs(args []string) (branch string, force bool) {
 		}
 	}
 	return branch, force
+}
+
+// parsePortArgs parses the --all flag for the port command
+func parsePortArgs(args []string) bool {
+	for _, a := range args {
+		if a == "--all" {
+			return true
+		}
+	}
+	return false
 }
