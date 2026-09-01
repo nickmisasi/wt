@@ -1,9 +1,11 @@
 # wt - Git Worktree Manager
 
+<!-- webhook-test: title comment -->
 A powerful CLI tool to manage Git worktrees across multiple repositories, designed for developers who work on multiple branches simultaneously using tools like Cursor.
 
 ## Features
 
+<!-- webhook-test: features comment -->
 - 🚀 **Seamless Directory Switching**: Automatically switches to worktree directories
 - 📋 **List Worktrees**: View all worktrees with status and last commit info
 - 🔄 **Smart Branch Handling**: Auto-creates tracking branches from remotes
@@ -462,5 +464,6 @@ Feel free to submit issues and pull requests!
 
 ## License
 
+<!-- webhook-test: license comment -->
 MIT
 
