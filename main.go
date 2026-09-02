@@ -28,7 +28,7 @@ func run() error {
 	}
 
 	if args[0] == "install" {
-		return cmd.RunInstall()
+		return cmd.RunInstall(args[1:])
 	}
 
 	if args[0] == "config" {

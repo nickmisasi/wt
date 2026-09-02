@@ -9,7 +9,7 @@ A powerful CLI tool to manage Git worktrees across multiple repositories, design
 - 🔄 **Smart Branch Handling**: Auto-creates tracking branches from remotes
 - 🧹 **Automatic Cleanup**: Remove stale worktrees older than 30 days
 - 💻 **Cursor Integration**: Open Cursor editor directly in worktree
-- ⚡ **Smart Completions**: Zsh auto-completions that prioritize existing worktrees
+- ⚡ **Smart Completions**: Zsh and Fish auto-completions for commands and branch names
 - 🧭 **Smart Navigation**: `cd ..` from worktree root takes you to ~/workspace
 - 🔗 **Mattermost Dual-Repo**: Special support for Mattermost's dual-repository workflow
 
@@ -44,12 +44,14 @@ wt install
 
 ### What `wt install` Does
 
-The `install` command will:
+The `install` command auto-detects your shell from `$SHELL` and installs the appropriate integration. Override with `wt install --shell fish` or `wt install --shell zsh`.
+
+**Zsh** (`wt install` or `wt install --shell zsh`):
 - Add a shell function to `~/.zshrc` for seamless directory switching
 - Install zsh completions for commands and branch names
 - Provide instructions for activation
 
-After installation, restart your terminal or run:
+After zsh installation, restart your terminal or run:
 
 ```bash
 source ~/.zshrc
@@ -72,7 +74,16 @@ Then reload your shell:
 source ~/.zshrc
 ```
 
+**Fish** (`wt install` or `wt install --shell fish`):
+- Add a `wt` function to `~/.config/fish/functions/wt.fish`
+- Add a smart `cd` wrapper to `~/.config/fish/conf.d/wt-integration.fish`
+- Install fish completions to `~/.config/fish/completions/wt.fish`
+
+After fish installation, open a new fish terminal. Fish autoloads functions and completions from `~/.config/fish/`.
+
 ### Manual Installation (Alternative)
+
+#### Zsh
 
 If you prefer to manually add the shell function, add this to your `~/.zshrc`:
 
@@ -116,6 +127,54 @@ cd() {
     fi
     builtin cd "$@"
 }
+# end wt-shell-integration
+```
+
+#### Fish
+
+Add `~/.config/fish/functions/wt.fish`:
+
+```fish
+# wt-shell-integration
+function wt --description 'Git worktree manager with directory switching'
+    set -l output (command wt $argv)
+    set -l exit_code $status
+    set -l saw_cd 0
+
+    for line in $output
+        if string match -q '__WT_CD__:*' -- $line
+            set -l new_dir (string replace '__WT_CD__:' '' -- $line)
+            cd $new_dir; or return $exit_code
+            set saw_cd 1
+        else if string match -q '__WT_CMD__:*' -- $line
+            if test $saw_cd -eq 1
+                set -l cmd (string replace '__WT_CMD__:' '' -- $line)
+                echo "Running setup: $cmd"
+                eval $cmd
+            end
+        else
+            echo $line
+        end
+    end
+
+    return $exit_code
+end
+```
+
+Add `~/.config/fish/conf.d/wt-integration.fish` (adjust paths to match your config):
+
+```fish
+# wt-shell-integration
+function cd --wraps cd --description 'Smart cd for worktrees'
+    if test (count $argv) -eq 1; and test "$argv[1]" = ..
+        set -l parent_dir (dirname $PWD)
+        if test "$parent_dir" = "$HOME/workspace/worktrees"
+            builtin cd "$HOME/workspace"
+            return
+        end
+    end
+    builtin cd $argv
+end
 # end wt-shell-integration
 ```
 
@@ -291,26 +350,9 @@ This makes worktrees feel naturally integrated into your workspace hierarchy wit
 
 ### Smart Tab Completions
 
-The zsh completions intelligently prioritize what you're most likely to want:
+The zsh and fish completions list commands, flags, and branch names for `wt co`, `wt rm`, and related subcommands.
 
-**When you press TAB after `wt co` or `wt cursor`:**
-1. **Existing worktrees** are shown first with "(existing worktree)" label
-2. **Local branches** come next with "(local branch)" label  
-3. **Remote branches** appear last with "(remote branch)" label
-
-**Example:**
-```bash
-wt co agents-<TAB>
-# Shows:
-#   agents-prom-grafana  -- existing worktree
-#   agents-dev          -- local branch
-#   agents-staging      -- remote branch
-
-wt cursor ai-<TAB>
-# Completes to existing worktree: wt cursor ai-prom-metrics
-```
-
-This makes it fast to switch between your active worktrees without typing full branch names.
+This makes it fast to switch between branches and worktrees without typing full branch names.
 
 ## Mattermost Dual-Repository Workflow
 
@@ -453,7 +495,7 @@ wt rm MM-12345
 
 - Go 1.16+ (for building)
 - Git 2.5+ (for worktree support)
-- Zsh (for shell integration)
+- Zsh or Fish (for shell integration)
 - Cursor CLI (optional, for `wt cursor` command)
 
 ## Contributing

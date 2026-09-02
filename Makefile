@@ -26,7 +26,7 @@ install: build ## Build and install the binary (tries system-wide, falls back to
 		sudo chmod +x $(INSTALL_PATH_SYSTEM)/$(BINARY_NAME); \
 		echo "✓ Installed to $(INSTALL_PATH_SYSTEM)/$(BINARY_NAME)"; \
 		echo ""; \
-		echo "Run 'wt install' to set up shell integration"; \
+		echo "Run 'wt install' to set up shell integration (auto-detects zsh or fish)"; \
 	else \
 		echo "No sudo access, installing to $(INSTALL_PATH_USER) (user-local)..."; \
 		mkdir -p $(INSTALL_PATH_USER); \
@@ -35,8 +35,11 @@ install: build ## Build and install the binary (tries system-wide, falls back to
 		echo "✓ Installed to $(INSTALL_PATH_USER)/$(BINARY_NAME)"; \
 		echo ""; \
 		echo "Make sure $(INSTALL_PATH_USER) is in your PATH:"; \
+		echo "  # zsh:"; \
 		echo "  echo 'export PATH=\"\$$HOME/bin:\$$PATH\"' >> ~/.zshrc"; \
 		echo "  source ~/.zshrc"; \
+		echo "  # fish:"; \
+		echo "  fish -c 'fish_add_path ~/bin'"; \
 		echo ""; \
 		echo "Then run 'wt install' to set up shell integration"; \
 	fi
@@ -63,7 +66,9 @@ uninstall: ## Uninstall the binary
 		echo "$(BINARY_NAME) not found in common installation paths"; \
 	fi
 	@echo ""
-	@echo "Note: Shell function in ~/.zshrc will remain. Run 'wt install' to remove it manually if needed."
+	@echo "Note: Shell integration files will remain:"
+	@echo "  zsh: ~/.zshrc"
+	@echo "  fish: ~/.config/fish/functions/wt.fish, ~/.config/fish/conf.d/wt-integration.fish"
 
 .DEFAULT_GOAL := help
 
